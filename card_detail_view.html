@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-error-container": "#ffdad6",
+                        "secondary": "#46eae5",
+                        "secondary-fixed-dim": "#2edcd7",
+                        "tertiary-fixed-dim": "#ffb77d",
+                        "tertiary-fixed": "#ffdcc3",
+                        "on-error": "#690005",
+                        "on-secondary-container": "#005250",
+                        "surface-container": "#1f1f22",
+                        "surface-container-lowest": "#0e0e11",
+                        "outline-variant": "#474554",
+                        "primary-fixed-dim": "#c6bfff",
+                        "secondary-fixed": "#5af9f3",
+                        "on-tertiary-fixed-variant": "#6e3900",
+                        "surface-dim": "#131316",
+                        "on-surface": "#e4e1e6",
+                        "error": "#ffb4ab",
+                        "surface-bright": "#39393c",
+                        "on-tertiary": "#4d2600",
+                        "inverse-surface": "#e4e1e6",
+                        "on-surface-variant": "#c8c4d7",
+                        "on-secondary": "#003735",
+                        "secondary-container": "#00cec9",
+                        "on-tertiary-container": "#fff5f1",
+                        "on-background": "#e4e1e6",
+                        "surface-container-low": "#1b1b1e",
+                        "surface-container-highest": "#353438",
+                        "background": "#131316",
+                        "surface": "#131316",
+                        "on-tertiary-fixed": "#2f1500",
+                        "tertiary-container": "#ac5d00",
+                        "on-primary-fixed-variant": "#4029ba",
+                        "inverse-primary": "#5847d2",
+                        "error-container": "#93000a",
+                        "on-secondary-fixed": "#00201f",
+                        "primary-container": "#6c5ce7",
+                        "on-secondary-fixed-variant": "#00504e",
+                        "on-primary-container": "#faf6ff",
+                        "primary-fixed": "#e4dfff",
+                        "on-primary-fixed": "#160066",
+                        "surface-variant": "#353438",
+                        "surface-tint": "#c6bfff",
+                        "outline": "#928ea0",
+                        "surface-container-high": "#2a2a2d",
+                        "tertiary": "#ffb77d",
+                        "inverse-on-surface": "#303033",
+                        "primary": "#c6bfff",
+                        "on-primary": "#2900a0"
+                    },
+                    fontFamily: {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(42, 42, 45, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .mana-cost-shadow {
+            text-shadow: 0 0 10px rgba(108, 92, 231, 0.5);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container">
+<header class="flex justify-between items-center w-full px-6 py-4 fixed top-0 z-50 bg-[#131316] border-b border-[#474554]/15">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#6c5ce7]" data-icon="auto_awesome">auto_awesome</span>
+<h1 class="font-['Plus_Jakarta_Sans'] font-bold tracking-tight text-xl font-black text-[#6c5ce7] uppercase tracking-widest">The Ethereal Archive</h1>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-[#1b1b1e] transition-colors active:scale-95 duration-200 text-[#474554]">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</header>
+<main class="pt-20 pb-32 max-w-2xl mx-auto px-4">
+<div class="relative group mt-6 mb-12 flex justify-center">
+<div class="absolute inset-0 bg-primary-container/20 blur-[80px] rounded-full transform -translate-y-12"></div>
+<div class="relative z-10 w-full max-w-[320px] aspect-[1/1.4] rounded-[1rem] overflow-hidden shadow-2xl transition-transform duration-500 hover:scale-[1.02]">
+<img alt="Detailed Magic Card Art" class="w-full h-full object-cover" data-alt="Rare mystical flower illustration on a trading card" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD05MV2kq_J6mdS6Jh4pSjrppaE8Vm6RtRIvLcpjka8Oe0EYwx_-GI_Md0AfQbUgV8bYJdW2-ITvu0J8XS7foRVuWxCNsSZKZGDsqeaetZ8Rz4MH_SglerN0peMTzLE_JOP9_HfFfgNPIgrkqFV6MmYYF-TaWmzBnOL1EwS6GEDpPrp0gvOtaPQVi2VlyyIz7pSKCjYuV2iIbS5T_ob-gkF6V1RlwW8G_Vg1lXDgUFaeESrV8BDFxXlhgOIJo180N4sulLVopGOoUNw"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent"></div>
+</div>
+<button class="absolute -bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-6 py-3 bg-surface-container-high border border-outline-variant/15 rounded-full shadow-xl transition-all hover:bg-surface-bright active:scale-95">
+<span class="material-symbols-outlined text-secondary" data-icon="zoom_in">zoom_in</span>
+<span class="font-headline font-bold text-sm uppercase tracking-wider">Inspect Holofoil</span>
+</button>
+</div>
+<section class="space-y-8">
+<div class="flex justify-between items-start">
+<div class="space-y-1">
+<h2 class="text-4xl font-headline font-extrabold tracking-tighter text-on-surface">Black Lotus</h2>
+<p class="text-secondary font-headline font-semibold text-sm uppercase tracking-widest">Artifact</p>
+</div>
+<div class="flex items-center gap-1.5 bg-surface-container-low px-4 py-2 rounded-full border border-outline-variant/10">
+<span class="font-headline font-bold text-xl mana-cost-shadow">0</span>
+<span class="material-symbols-outlined text-primary text-lg" data-icon="circle" style="font-variation-settings: 'FILL' 1;">circle</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="glass-panel p-6 rounded-xl border border-outline-variant/15 space-y-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="language">language</span>
+<h3 class="font-headline text-xs font-bold uppercase tracking-widest text-outline">Original Rules</h3>
+</div>
+<p class="text-on-surface-variant leading-relaxed font-body italic">
+                        {T}, Sacrifice Black Lotus: Add three mana of any one color to your mana pool.
+                    </p>
+</div>
+<div class="bg-primary-container/5 p-6 rounded-xl border border-primary-container/20 space-y-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="translate">translate</span>
+<h3 class="font-headline text-xs font-bold uppercase tracking-widest text-primary">Tradução (PT-BR)</h3>
+</div>
+<p class="text-on-primary-container leading-relaxed font-body">
+                        {T}, Sacrifique Black Lotus: Adicione três manas de qualquer cor à sua reserva de mana.
+                    </p>
+</div>
+</div>
+<div class="bg-surface-container-low p-5 rounded-xl flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-[10px] font-headline font-bold uppercase tracking-[0.2em] text-outline">Market Value</span>
+<span class="text-2xl font-headline font-extrabold text-secondary">$514,290.00</span>
+</div>
+<div class="h-10 w-[1px] bg-outline-variant/30"></div>
+<div class="flex flex-col items-end">
+<span class="text-[10px] font-headline font-bold uppercase tracking-[0.2em] text-outline">Condition</span>
+<span class="text-lg font-headline font-bold text-on-surface">Gem Mint 10</span>
+</div>
+</div>
+</section>
+<div class="mt-12 flex flex-col gap-4">
+<button class="w-full py-5 bg-gradient-to-br from-[#c6bfff] to-[#6c5ce7] text-white font-headline font-extrabold rounded-xl shadow-lg shadow-primary-container/20 flex items-center justify-center gap-3 transition-all hover:brightness-110 active:scale-[0.98]">
+<span class="material-symbols-outlined" data-icon="center_focus_strong">center_focus_strong</span>
+                ESCANEAR NOVA CARTA
+            </button>
+<button class="w-full py-4 bg-surface-container-highest/40 text-on-surface-variant font-headline font-bold rounded-xl border border-outline-variant/15 flex items-center justify-center gap-2 transition-all hover:bg-surface-container-highest active:scale-[0.98]">
+<span class="material-symbols-outlined text-sm" data-icon="arrow_back">arrow_back</span>
+                VOLTAR
+            </button>
+</div>
+</main>
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-end pb-6 px-4 bg-[#0e0e11]/90 backdrop-blur-md shadow-[0_-10px_30px_rgba(0,0,0,0.5)] rounded-t-[0.75rem]">
+<div class="flex flex-col items-center justify-center text-[#474554] px-4 py-2 hover:text-[#00cec9] transition-colors cursor-pointer group">
+<span class="material-symbols-outlined mb-1" data-icon="grid_view">grid_view</span>
+<span class="font-['Inter'] text-[10px] font-semibold uppercase tracking-tighter">Archive</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-gradient-to-br from-[#c6bfff] to-[#6c5ce7] text-white rounded-[0.75rem] px-5 py-2 scale-110 -translate-y-2 transition-all cursor-pointer shadow-lg">
+<span class="material-symbols-outlined mb-1" data-icon="center_focus_strong" style="font-variation-settings: 'FILL' 1;">center_focus_strong</span>
+<span class="font-['Inter'] text-[10px] font-semibold uppercase tracking-tighter">Scanner</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#474554] px-4 py-2 hover:text-[#00cec9] transition-colors cursor-pointer group">
+<span class="material-symbols-outlined mb-1" data-icon="payments">payments</span>
+<span class="font-['Inter'] text-[10px] font-semibold uppercase tracking-tighter">Market</span>
+</div>
+</nav>
+</body></html>

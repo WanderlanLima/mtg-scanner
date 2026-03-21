@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Ethereal Archive - MTG Scanner</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-error-container": "#ffdad6",
+                        "secondary": "#46eae5",
+                        "secondary-fixed-dim": "#2edcd7",
+                        "tertiary-fixed-dim": "#ffb77d",
+                        "tertiary-fixed": "#ffdcc3",
+                        "on-error": "#690005",
+                        "on-secondary-container": "#005250",
+                        "surface-container": "#1f1f22",
+                        "surface-container-lowest": "#0e0e11",
+                        "outline-variant": "#474554",
+                        "primary-fixed-dim": "#c6bfff",
+                        "secondary-fixed": "#5af9f3",
+                        "on-tertiary-fixed-variant": "#6e3900",
+                        "surface-dim": "#131316",
+                        "on-surface": "#e4e1e6",
+                        "error": "#ffb4ab",
+                        "surface-bright": "#39393c",
+                        "on-tertiary": "#4d2600",
+                        "inverse-surface": "#e4e1e6",
+                        "on-surface-variant": "#c8c4d7",
+                        "on-secondary": "#003735",
+                        "secondary-container": "#00cec9",
+                        "on-tertiary-container": "#fff5f1",
+                        "on-background": "#e4e1e6",
+                        "surface-container-low": "#1b1b1e",
+                        "surface-container-highest": "#353438",
+                        "background": "#131316",
+                        "surface": "#131316",
+                        "on-tertiary-fixed": "#2f1500",
+                        "tertiary-container": "#ac5d00",
+                        "on-primary-fixed-variant": "#4029ba",
+                        "inverse-primary": "#5847d2",
+                        "error-container": "#93000a",
+                        "on-secondary-fixed": "#00201f",
+                        "primary-container": "#6c5ce7",
+                        "on-secondary-fixed-variant": "#00504e",
+                        "on-primary-container": "#faf6ff",
+                        "primary-fixed": "#e4dfff",
+                        "on-primary-fixed": "#160066",
+                        "surface-variant": "#353438",
+                        "surface-tint": "#c6bfff",
+                        "outline": "#928ea0",
+                        "surface-container-high": "#2a2a2d",
+                        "tertiary": "#ffb77d",
+                        "inverse-on-surface": "#303033",
+                        "primary": "#c6bfff",
+                        "on-primary": "#2900a0"
+                    },
+                    fontFamily: {
+                        "headline": ["Plus Jakarta Sans"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-panel {
+            background: rgba(27, 27, 30, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body selection:bg-primary-container selection:text-white pb-32">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-6 py-4 fixed top-0 z-50 bg-[#131316] border-b border-[#474554]/15">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#6c5ce7]" data-icon="auto_awesome">auto_awesome</span>
+<h1 class="font-['Plus_Jakarta_Sans'] font-bold tracking-tight text-xl font-black text-[#6c5ce7] uppercase tracking-widest">MTG Card Scanner</h1>
+</div>
+<button class="p-2 rounded-full hover:bg-[#1b1b1e] transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined text-[#474554]" data-icon="settings">settings</span>
+</button>
+</header>
+<main class="pt-24 px-4 max-w-2xl mx-auto space-y-8">
+<!-- Search Section -->
+<section class="space-y-6">
+<div class="relative group">
+<div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline" data-icon="search">search</span>
+</div>
+<input class="w-full h-14 pl-12 pr-4 bg-surface-container-lowest border-none rounded-xl text-on-surface placeholder:text-outline/60 focus:ring-0 focus:outline-none focus:bg-surface-container-low transition-all" placeholder="Digite o nome da carta..." type="text"/>
+<div class="absolute bottom-0 left-0 w-full h-0.5 bg-secondary-container scale-x-0 group-focus-within:scale-x-100 transition-transform duration-300 origin-left"></div>
+</div>
+<button class="w-full py-4 px-6 flex items-center justify-center gap-3 bg-gradient-to-br from-[#c6bfff] to-[#6c5ce7] text-white font-headline font-bold rounded-xl shadow-lg active:scale-95 transition-transform duration-200">
+<span class="material-symbols-outlined" data-icon="center_focus_strong">center_focus_strong</span>
+<span>Escanear carta</span>
+</button>
+<!-- Autocomplete / Suggestions -->
+<div class="glass-panel rounded-xl p-4 space-y-1 border border-outline-variant/10">
+<span class="text-[10px] font-bold uppercase tracking-widest text-outline px-2 pb-2 block">Sugestões Populares</span>
+<div class="flex flex-col">
+<button class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-container-highest transition-colors text-left group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-sm" data-icon="history">history</span>
+<span class="text-sm font-medium">Yuriko, the Tiger's Shadow</span>
+</button>
+<button class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-container-highest transition-colors text-left group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-sm" data-icon="history">history</span>
+<span class="text-sm font-medium">Lightning Bolt</span>
+</button>
+<button class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-container-highest transition-colors text-left group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-sm" data-icon="history">history</span>
+<span class="text-sm font-medium">Sol Ring</span>
+</button>
+<button class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-container-highest transition-colors text-left group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-sm" data-icon="history">history</span>
+<span class="text-sm font-medium text-tertiary">Black Lotus</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Card Preview Section -->
+<section class="space-y-4">
+<h2 class="font-headline font-extrabold text-lg text-primary tracking-tight px-1">Última Descoberta</h2>
+<div class="bg-surface-container-low rounded-[1.25rem] overflow-hidden p-1">
+<div class="bg-surface p-4 rounded-full flex flex-col md:flex-row gap-6">
+<!-- Image with HUD Overlay -->
+<div class="relative w-full md:w-64 aspect-[63/88] rounded-xl overflow-hidden bg-surface-container-highest shadow-2xl">
+<img alt="MTG Card Image" class="w-full h-full object-cover" data-alt="Close up of an ornate fantasy illustration on a card" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7rCc3xrlZxkoWvpzVjyiuWKQ2Qou2h9R5TcLeGFs2w2jw4IwkWEZt3YWhbHRao9htDRQfCR8YwPA8ZcEwnRLTtWW4JxSfOMlpleAKztwBPjKEjIckRXMENfW4f95Y1Iyms4BWCSxuuPFoti_9dgXRDuFQGR_OH8xM-nWI30wHrpMfweMjmDdM3teZpBuAoLFspU98l0FnYezyqC6nbnF8mmBWKX8VJQMYN-rGz8rlOfKFLC2t5uOlJIzSb2-hYOjSHnrMTTyOST24"/>
+<div class="absolute inset-0 border-[3px] border-secondary/40 pointer-events-none rounded-xl"></div>
+<div class="absolute top-2 right-2 bg-secondary-container text-on-secondary-container text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-tighter">
+                            Escaneado
+                        </div>
+</div>
+<!-- Card Details -->
+<div class="flex-1 space-y-4 py-2">
+<div class="flex justify-between items-start">
+<div class="space-y-1">
+<h3 class="font-headline font-bold text-2xl leading-none">Yuriko, the Tiger's Shadow</h3>
+<p class="text-xs text-outline font-medium tracking-wide uppercase">Legendary Creature — Human Ninja</p>
+</div>
+<div class="flex items-center gap-1 bg-surface-container-high px-2 py-1 rounded-lg">
+<span class="text-sm font-bold font-headline">UB</span>
+</div>
+</div>
+<div class="space-y-4">
+<!-- Original Text -->
+<div class="space-y-2">
+<span class="text-[10px] font-bold text-outline-variant uppercase tracking-widest">Oracle Text</span>
+<p class="text-sm text-on-surface-variant leading-relaxed">
+                                    Commander ninjutsu {U}{B} <br/>
+                                    Whenever a Ninja you control deals combat damage to a player, reveal the top card of your library and put that card into your hand. Each opponent loses life equal to that card's mana value.
+                                </p>
+</div>
+<!-- Translation Tonal Shift Divider -->
+<div class="h-px w-full bg-outline-variant/20"></div>
+<!-- Portuguese Translation -->
+<div class="space-y-2">
+<span class="text-[10px] font-bold text-secondary uppercase tracking-widest flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]" data-icon="translate">translate</span>
+                                    Tradução PT-BR
+                                </span>
+<p class="text-sm text-on-surface italic leading-relaxed">
+                                    Ninjutsu de comandante {U}{B} <br/>
+                                    Toda vez que um Ninja que você controla causar dano de combate a um jogador, revele o card do topo de seu grimório e coloque-o em sua mão. Cada oponente perde uma quantidade de vida igual ao valor de mana daquele card.
+                                </p>
+</div>
+</div>
+<!-- Stats/Price Badges -->
+<div class="flex gap-2 pt-2">
+<div class="flex-1 bg-surface-container-highest/50 p-3 rounded-xl border border-outline-variant/10">
+<span class="text-[9px] uppercase text-outline block mb-1">Market Price</span>
+<span class="font-headline font-bold text-lg text-primary">R$ 42,90</span>
+</div>
+<div class="flex-1 bg-surface-container-highest/50 p-3 rounded-xl border border-outline-variant/10">
+<span class="text-[9px] uppercase text-outline block mb-1">Condition</span>
+<span class="font-headline font-bold text-lg text-secondary">NM</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-end pb-6 px-4 bg-[#0e0e11]/90 backdrop-blur-md shadow-[0_-10px_30px_rgba(0,0,0,0.5)] rounded-t-[0.75rem]">
+<a class="flex flex-col items-center justify-center text-[#474554] px-4 py-2 hover:text-[#00cec9] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="font-['Inter'] text-[10px] font-semibold uppercase tracking-tighter">Archive</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-gradient-to-br from-[#c6bfff] to-[#6c5ce7] text-white rounded-[0.75rem] px-5 py-2 scale-110 -translate-y-2 transition-all shadow-xl" href="#">
+<span class="material-symbols-outlined" data-icon="center_focus_strong">center_focus_strong</span>
+<span class="font-['Inter'] text-[10px] font-semibold uppercase tracking-tighter">Scanner</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#474554] px-4 py-2 hover:text-[#00cec9] transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-['Inter'] text-[10px] font-semibold uppercase tracking-tighter">Market</span>
+</a>
+</nav>
+</body></html>
