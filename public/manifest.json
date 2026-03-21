@@ -1,7 +1,7 @@
 {
   "name": "MTG Card Scanner",
   "short_name": "MTG Scanner",
-  "start_url": "/",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#0f0f12",
   "theme_color": "#0f0f12",
