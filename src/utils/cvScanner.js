@@ -32,10 +32,10 @@ export function findCardContour(videoElement) {
     window.cv.cvtColor(src, gray, window.cv.COLOR_RGBA2GRAY, 0);
 
     const blurred = new window.cv.Mat();
-    window.cv.GaussianBlur(gray, blurred, new window.cv.Size(5, 5), 0, 0, window.cv.BORDER_DEFAULT);
+    window.cv.GaussianBlur(gray, blurred, new window.cv.Size(11, 11), 0, 0, window.cv.BORDER_DEFAULT);
 
     const edges = new window.cv.Mat();
-    window.cv.Canny(blurred, edges, 75, 200, 3, false);
+    window.cv.Canny(blurred, edges, 40, 150, 3, false);
 
     const contours = new window.cv.MatVector();
     const hierarchy = new window.cv.Mat();
@@ -51,7 +51,7 @@ export function findCardContour(videoElement) {
       if (area > minCardArea) {
         const peri = window.cv.arcLength(cnt, true);
         const approx = new window.cv.Mat();
-        window.cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+        window.cv.approxPolyDP(cnt, approx, 0.04 * peri, true);
         
         if (approx.rows === 4 && area > maxArea) {
           maxArea = area;
@@ -126,9 +126,10 @@ export function warpCardPerspective(videoElement, canvasObj, points) {
     const dsize = new window.cv.Size(w, h);
     window.cv.warpPerspective(src, dst, M, dsize, window.cv.INTER_LINEAR, window.cv.BORDER_CONSTANT, new window.cv.Scalar());
 
-    // Preprocess warped image for Tesseract (Grayscale)
+    // Preprocess warped image for Tesseract (Grayscale + Light Blur to destroy screen Moiré patterns)
     const gray = new window.cv.Mat();
     window.cv.cvtColor(dst, gray, window.cv.COLOR_RGBA2GRAY, 0);
+    window.cv.GaussianBlur(gray, gray, new window.cv.Size(3, 3), 0, 0, window.cv.BORDER_DEFAULT);
 
     const outCanvas = document.createElement('canvas');
     outCanvas.width = w; outCanvas.height = h;

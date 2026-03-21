@@ -86,13 +86,31 @@ export default function ScannerPage() {
       }
 
       // 1. Detect contour via OpenCV
-      const points = findCardContour(videoRef.current);
+      let points = findCardContour(videoRef.current);
       
       const ctx = canvasRef.current.getContext('2d');
       ctx.clearRect(0, 0, w, h);
       
-      if (points) {
-        // 2. Draw AR polygon mapping the physical card
+      if (!points) {
+         // Hybrid Fallback: If edge tracking drops due to trembling or blur, use standard center box
+         const cw = w * 0.55; 
+         const ch = cw * 1.4; 
+         const cx = (w - cw) / 2;
+         const cy = (h - ch) / 2;
+         points = [
+            {x: cx, y: cy},
+            {x: cx + cw, y: cy},
+            {x: cx + cw, y: cy + ch},
+            {x: cx, y: cy + ch}
+         ];
+         // Draw subtle dashed targeting guide
+         ctx.setLineDash([12, 12]);
+         ctx.strokeStyle = 'rgba(70, 234, 229, 0.5)';
+         ctx.lineWidth = 3;
+         ctx.strokeRect(cx, cy, cw, ch);
+         ctx.setLineDash([]);
+      } else {
+        // 2. Draw AR polygon mapping the physical card securely
         ctx.beginPath();
         ctx.moveTo(points[0].x, points[0].y);
         ctx.lineTo(points[1].x, points[1].y);
@@ -104,6 +122,7 @@ export default function ScannerPage() {
         ctx.stroke();
         ctx.fillStyle = 'rgba(70, 234, 229, 0.2)';
         ctx.fill();
+      }
 
         // 3. Extract and Flatten Perspective
         const warpedImageSrc = warpCardPerspective(videoRef.current, processCanvasRef.current, points);
@@ -129,7 +148,6 @@ export default function ScannerPage() {
              console.error("OCR falhou:", e);
            }
         }
-      }
       
       isProcessing = false;
       if (scanning) {
