@@ -29,16 +29,28 @@ export default function CardDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    if (card && card.oracle_text) {
+    if (card) {
       const translate = async () => {
         setIsTranslating(true);
+        
         if (targetLang === 'en') {
-           setTranslatedText(card.oracle_text);
+           setTranslatedText(card.oracle_text || '');
            setIsTranslating(false);
            return;
         }
-        const text = await translateText(card.oracle_text, targetLang);
-        setTranslatedText(text);
+
+        if (card.lang === targetLang && card.printed_text) {
+           setTranslatedText(card.printed_text);
+           setIsTranslating(false);
+           return;
+        }
+        
+        if (card.oracle_text) {
+          const text = await translateText(card.oracle_text, targetLang);
+          setTranslatedText(text);
+        } else {
+          setTranslatedText('');
+        }
         setIsTranslating(false);
       };
       translate();
