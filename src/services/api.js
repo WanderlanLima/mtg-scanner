@@ -14,7 +14,10 @@ export const searchAutocomplete = async (term) => {
 export const fetchCardByName = async (name) => {
   try {
     const safeName = name.replace(/"/g, '');
-    const res = await fetch(`https://api.scryfall.com/cards/search?q=+"${encodeURIComponent(safeName)}"`);
+    const query = `lang:any "${safeName}"`;
+    const searchUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}`;
+    
+    const res = await fetch(searchUrl);
     if (!res.ok) {
       const fuzzyRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
       if (fuzzyRes.ok) return await fuzzyRes.json();
