@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CardPreview from '../components/CardPreview';
+import CardLegalities from '../components/CardLegalities';
+import CardRulings from '../components/CardRulings';
 import { fetchCardByName, translateText } from '../services/api';
 
 export default function CardDetailPage() {
@@ -104,6 +106,10 @@ export default function CardDetailPage() {
         translatedText={translatedText}
         isTranslating={isTranslating}
       />
+
+      <CardLegalities card={card} />
+
+      <CardRulings card={card} targetLang={targetLang} />
     </div>
   );
 }

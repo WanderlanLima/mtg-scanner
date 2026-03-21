@@ -47,3 +47,16 @@ export const translateText = async (text, targetLang = 'pt') => {
     return text;
   }
 };
+
+export const fetchCardRulings = async (rulingsUri) => {
+  if (!rulingsUri) return [];
+  try {
+    const res = await fetch(rulingsUri);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.data || [];
+  } catch (error) {
+    console.error("Scryfall rulings fetch error:", error);
+    return [];
+  }
+};
