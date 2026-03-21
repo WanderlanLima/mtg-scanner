@@ -28,16 +28,38 @@ async function mineData() {
   console.log(`✅ ${cards.length} cartas lidas no JSON Mestre. Filtrando apenas as que possuem Artes Digitais...`);
   const validCards = cards.filter(c => c.image_uris && c.image_uris.normal);
   
-  // PARA FINS DE DEMONSTRAÇÃO (POC): Iremos processar apenas as primeiras 15 cartas
-  // Altere 'limit' para validCards.length para fuzilar o banco de dados inteiro (ATENÇÃO: Demora HORAS)
-  const LIMIT = 15;
-  console.log(`🚀 Iniciando o processamento Lote em Massa (Processando as primeiras ${LIMIT} cartas)...`);
+  // ALERTA DE CARGA MASSIVA: Limite foi removido. Processando o catálogo integral!
+  const LIMIT = validCards.length;
+  console.log(`🚀 Iniciando o processamento Lote em Massa (Processando TODAS as ${LIMIT} cartas)...`);
+  
+  console.log('🔍 Consultando Supabase para descobrir quais cartas já existem no seu banco...');
+  const existingIds = new Set();
+  // Supabase limits select to 1000 rows by default, we need to paginate to get all 80k
+  let hasMore = true;
+  let offset = 0;
+  while (hasMore) {
+    const { data, error } = await supabase.from('mtg_cards').select('scryfall_id').range(offset, offset + 999);
+    if (error) { console.error("Erro ao ler banco:", error); break; }
+    data.forEach(row => existingIds.add(row.scryfall_id));
+    if (data.length === 1000) offset += 1000; else hasMore = false;
+  }
+  console.log(`⚡ ${existingIds.size} cartas já existem na Nuvem! Elas serão puladas em frações de segundo.`);
   
   let successCount = 0;
+  let skippedCount = 0;
   
   for (let i = 0; i < LIMIT; i++) {
     const card = validCards[i];
-    console.log(`[${i+1}/${LIMIT}] Desmontando Cartão: ${card.name} (${card.set.toUpperCase()})`);
+    
+    // DELTA SYNC: Pula a carta se ela já foi minerada antes!
+    if (existingIds.has(card.id)) {
+      skippedCount++;
+      // Apenas não flodar a tela para pular:
+      // console.log(`[${i+1}/${LIMIT}] ⏭️ Pulo Rápido: ${card.name} já existe.`);
+      continue;
+    }
+
+    console.log(`[${i+1}/${LIMIT}] Desmontando NOVA Carta: ${card.name} (${card.set.toUpperCase()})`);
     
     try {
       // Extract Mathematical Vector Embedding directly from Scryfall CDN image string
