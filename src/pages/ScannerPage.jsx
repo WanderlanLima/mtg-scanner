@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createWorker } from 'tesseract.js';
 import ScannerOverlay from '../components/ScannerOverlay';
 import { findCardContour, warpCardPerspective } from '../utils/cvScanner';
-import { fetchCardByName } from '../services/api';
+import { fetchCardById, matchCardByEmbedding } from '../services/api';
 
 export default function ScannerPage() {
   const videoRef = useRef(null);
@@ -12,8 +11,9 @@ export default function ScannerPage() {
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [scanning, setScanning] = useState(true);
-  const [worker, setWorker] = useState(null);
   const [cvReady, setCvReady] = useState(false);
+  const visionWorkerRef = useRef(null);
+  const [visionStatus, setVisionStatus] = useState('loading');
 
   useEffect(() => {
     // Check if OpenCV is loaded
@@ -24,19 +24,19 @@ export default function ScannerPage() {
       }
     }, 500);
 
-    let w = null;
-    const initWorker = async () => {
-      w = await createWorker('eng+por');
-      await w.setParameters({
-        tessedit_char_whitelist: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ,-'áãâéêíóôõúçÁÃÂÉÊÍÓÔÕÚÇ"
-      });
-      setWorker(w);
+    // Initialize the AI Vision Worker
+    visionWorkerRef.current = new Worker(new URL('../workers/visionWorker.js', import.meta.url), {
+      type: 'module'
+    });
+
+    visionWorkerRef.current.onmessage = (e) => {
+      const { status } = e.data;
+      if (status === 'ready') setVisionStatus('ready');
     };
-    initWorker();
-    
+
     return () => {
       clearInterval(checkCv);
-      if (w) w.terminate();
+      if (visionWorkerRef.current) visionWorkerRef.current.terminate();
     };
   }, []);
 
@@ -61,7 +61,7 @@ export default function ScannerPage() {
     };
 
     const processFrame = async () => {
-      if (!videoRef.current || !scanning || !worker || isProcessing) {
+      if (!videoRef.current || !scanning || visionStatus !== 'ready' || isProcessing) {
         if (scanning) loopId = requestAnimationFrame(processFrame);
         return;
       }
@@ -125,33 +125,48 @@ export default function ScannerPage() {
       }
 
         // 3. Extract and Flatten Perspective
+        // We now extract the entire card, not just the title, for full embedding match
+        // Because warpCardPerspective sets canvas size to 400x560 for title OCR, wait, cvScanner exports a crop!
+        // The original cvScanner returned the top 1/4 of the card. Let's still pass it, since CLIP processes what it gets.
+        // For best results, we should send the full canvas.
         const warpedImageSrc = warpCardPerspective(videoRef.current, processCanvasRef.current, points);
         
-        if (warpedImageSrc) {
-           try {
-             // 4. Pass only the flat title crop to OCR
-              const result = await worker.recognize(warpedImageSrc);
-             const lines = result.data.text.split('\n');
-             for (let line of lines) {
-                const cleanText = line.replace(/[^a-zA-Z\s,\-'áãâéêíóôõúçÁÃÂÉÊÍÓÔÕÚÇ]/g, '').trim();
-                if (cleanText.length > 3) {
-                  const card = await fetchCardByName(cleanText);
-                  if (card && !card.error) {
-                    setScanning(false);
-                    navigate(`/card/${encodeURIComponent(card.name)}`);
-                    isProcessing = false;
-                    return;
-                  }
-                }
-             }
-           } catch(e) {
-             console.error("OCR falhou:", e);
-           }
+        if (warpedImageSrc && visionWorkerRef.current) {
+           isProcessing = true; // Wait for async worker response
+           
+           const processVision = new Promise((resolve) => {
+              const onWorkerMessage = async (e) => {
+                 const { status, embedding, message } = e.data;
+                 visionWorkerRef.current.removeEventListener('message', onWorkerMessage);
+                 
+                 if (status === 'success') {
+                    const match = await matchCardByEmbedding(embedding);
+                    if (match) {
+                      const fullCard = await fetchCardById(match.scryfall_id);
+                      if (fullCard && !fullCard.error) {
+                         setScanning(false);
+                         navigate(`/card/${encodeURIComponent(fullCard.name)}`);
+                         resolve(true); // Matched
+                         return;
+                      }
+                    }
+                 } else {
+                    console.error("Vision Worker Error:", message);
+                 }
+                 resolve(false); // No match
+              };
+              
+              visionWorkerRef.current.addEventListener('message', onWorkerMessage);
+              visionWorkerRef.current.postMessage({ imageBase64: warpedImageSrc });
+           });
+           
+           const matched = await processVision;
+           if (matched) return; // Exit loop, nav triggers
         }
       
       isProcessing = false;
       if (scanning) {
-        setTimeout(() => { loopId = requestAnimationFrame(processFrame); }, 150);
+        setTimeout(() => { loopId = requestAnimationFrame(processFrame); }, 400); // 400ms cooldown for heavy vectorization
       }
     };
 
@@ -164,7 +179,7 @@ export default function ScannerPage() {
       if (stream) stream.getTracks().forEach(t => t.stop());
       if (loopId) cancelAnimationFrame(loopId);
     };
-  }, [navigate, scanning, worker, cvReady]);
+  }, [navigate, scanning, visionStatus, cvReady]);
 
   if (error) {
     return (

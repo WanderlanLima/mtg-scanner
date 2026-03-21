@@ -1,3 +1,10 @@
+import { createClient } from '@supabase/supabase-js';
+
+// Usamos Variaveis de Ambiente do Vite para esconder a chave!
+const SUPABASE_URL = 'https://nucbuxckedidwpsaenmz.supabase.co';
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
 export const searchAutocomplete = async (term) => {
   if (!term || term.trim().length === 0) return [];
   try {
@@ -58,5 +65,36 @@ export const fetchCardRulings = async (rulingsUri) => {
   } catch (error) {
     console.error("Scryfall rulings fetch error:", error);
     return [];
+  }
+};
+
+export const fetchCardById = async (id) => {
+  try {
+    const response = await fetch(`https://api.scryfall.com/cards/${id}`);
+    if (!response.ok) return { error: "Carta não encontrada." };
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Scryfall API Error:", error);
+    return { error: "Erro de conexão com o banco de dados." };
+  }
+};
+
+export const matchCardByEmbedding = async (embeddingArray) => {
+  try {
+    const { data, error } = await supabase.rpc('match_card', {
+      query_embedding: embeddingArray,
+      match_threshold: 0.85, // Requires 85% mathematical similarity to match
+      match_count: 1
+    });
+
+    if (error) throw error;
+    if (data && data.length > 0) {
+       return data[0]; 
+    }
+    return null;
+  } catch (err) {
+    console.error("Supabase pgvector match error:", err);
+    return null;
   }
 };

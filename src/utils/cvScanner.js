@@ -126,25 +126,16 @@ export function warpCardPerspective(videoElement, canvasObj, points) {
     const dsize = new window.cv.Size(w, h);
     window.cv.warpPerspective(src, dst, M, dsize, window.cv.INTER_LINEAR, window.cv.BORDER_CONSTANT, new window.cv.Scalar());
 
-    // Preprocess warped image for Tesseract (Grayscale + Light Blur to destroy screen Moiré patterns)
-    const gray = new window.cv.Mat();
-    window.cv.cvtColor(dst, gray, window.cv.COLOR_RGBA2GRAY, 0);
-    window.cv.GaussianBlur(gray, gray, new window.cv.Size(3, 3), 0, 0, window.cv.BORDER_DEFAULT);
-
+    // For Neural Network Embeddings, we need the FULL colored image (RGB), not grayscale.
     const outCanvas = document.createElement('canvas');
     outCanvas.width = w; outCanvas.height = h;
-    window.cv.imshow(outCanvas, gray);
+    window.cv.imshow(outCanvas, dst);
 
     // Cleanup memory to prevent WASM leaks
-    src.delete(); srcTri.delete(); dstTri.delete(); M.delete(); dst.delete(); gray.delete();
+    src.delete(); srcTri.delete(); dstTri.delete(); M.delete(); dst.delete();
 
-    // Tesseract needs a larger sweep (top 25%) to capture highly styled alternative MTG arts
-    const titleCanvas = document.createElement('canvas');
-    titleCanvas.width = w; titleCanvas.height = 140; 
-    const titleCtx = titleCanvas.getContext('2d');
-    titleCtx.drawImage(outCanvas, 0, 0, w, 140, 0, 0, w, 140);
-
-    return titleCanvas.toDataURL('image/png');
+    // Return the full 400x560 flattened card 
+    return outCanvas.toDataURL('image/png');
   } catch (err) {
     console.error('Warp error:', err);
     return null;
