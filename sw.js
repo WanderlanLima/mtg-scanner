@@ -1,14 +1,17 @@
 const CACHE_NAME = 'mtg-scanner-v1';
-const urlsToCache = [
+const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  '/icon-192x192.png',
+  '/icon-512x512.png',
+  'https://docs.opencv.org/4.8.0/opencv.js'
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
+      .then(cache => cache.addAll(ASSETS_TO_CACHE))
   );
 });
 
