@@ -34,11 +34,12 @@ export const fetchCardByName = async (name) => {
 export const translateText = async (text, targetLang = 'pt') => {
   if (!text) return '';
   try {
-    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|${targetLang}`);
-    if (!res.ok) return text; // fallback to original if API fails
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    if (!res.ok) return text;
     const data = await res.json();
-    if (data && data.responseData && data.responseData.translatedText) {
-      return data.responseData.translatedText;
+    if (data && data[0]) {
+      return data[0].map(s => s[0]).join('');
     }
     return text;
   } catch (error) {
