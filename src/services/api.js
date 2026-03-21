@@ -84,7 +84,7 @@ export const matchCardByEmbedding = async (embeddingArray) => {
   try {
     const { data, error } = await supabase.rpc('match_card', {
       query_embedding: embeddingArray,
-      match_threshold: 0.85, // Requires 85% mathematical similarity to match
+      match_threshold: 0.70, // Rebaixado de 0.85 para tolerar Moiré e Distorção Câmera
       match_count: 1
     });
 
