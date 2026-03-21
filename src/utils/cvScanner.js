@@ -137,11 +137,11 @@ export function warpCardPerspective(videoElement, canvasObj, points) {
     // Cleanup memory to prevent WASM leaks
     src.delete(); srcTri.delete(); dstTri.delete(); M.delete(); dst.delete(); gray.delete();
 
-    // Tesseract only needs the top 15% (where the card name is located)
+    // Tesseract needs a larger sweep (top 25%) to capture highly styled alternative MTG arts
     const titleCanvas = document.createElement('canvas');
-    titleCanvas.width = w; titleCanvas.height = 84; 
+    titleCanvas.width = w; titleCanvas.height = 140; 
     const titleCtx = titleCanvas.getContext('2d');
-    titleCtx.drawImage(outCanvas, 0, 0, w, 84, 0, 0, w, 84);
+    titleCtx.drawImage(outCanvas, 0, 0, w, 140, 0, 0, w, 140);
 
     return titleCanvas.toDataURL('image/png');
   } catch (err) {

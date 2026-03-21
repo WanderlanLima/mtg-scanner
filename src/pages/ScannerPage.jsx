@@ -26,9 +26,9 @@ export default function ScannerPage() {
 
     let w = null;
     const initWorker = async () => {
-      w = await createWorker('eng');
+      w = await createWorker('eng+por');
       await w.setParameters({
-        tessedit_char_whitelist: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ,-'"
+        tessedit_char_whitelist: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ,-'áãâéêíóôõúçÁÃÂÉÊÍÓÔÕÚÇ"
       });
       setWorker(w);
     };
@@ -111,10 +111,10 @@ export default function ScannerPage() {
         if (warpedImageSrc) {
            try {
              // 4. Pass only the flat title crop to OCR
-             const result = await worker.recognize(warpedImageSrc);
+              const result = await worker.recognize(warpedImageSrc);
              const lines = result.data.text.split('\n');
              for (let line of lines) {
-                const cleanText = line.replace(/[^a-zA-Z\s,\-']/g, '').trim();
+                const cleanText = line.replace(/[^a-zA-Z\s,\-'áãâéêíóôõúçÁÃÂÉÊÍÓÔÕÚÇ]/g, '').trim();
                 if (cleanText.length > 3) {
                   const card = await fetchCardByName(cleanText);
                   if (card && !card.error) {
