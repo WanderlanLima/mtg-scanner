@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import ScannerOverlay from '../components/ScannerOverlay';
 import { findCardContour, warpCardPerspective } from '../utils/cvScanner';
 import { fetchCardById, matchCardByEmbedding } from '../services/api';
+import VisionWorker from '../workers/visionWorker.js?worker';
 
 export default function ScannerPage() {
   const videoRef = useRef(null);
@@ -13,7 +14,7 @@ export default function ScannerPage() {
   const [scanning, setScanning] = useState(true);
   const [cvReady, setCvReady] = useState(false);
   const visionWorkerRef = useRef(null);
-  const [visionStatus, setVisionStatus] = useState('loading');
+  const visionStatusRef = useRef('loading');
 
   useEffect(() => {
     // Check if OpenCV is loaded
@@ -24,14 +25,12 @@ export default function ScannerPage() {
       }
     }, 500);
 
-    // Initialize the AI Vision Worker
-    visionWorkerRef.current = new Worker(new URL('../workers/visionWorker.js', import.meta.url), {
-      type: 'module'
-    });
+    // Initialize the AI Vision Worker safely using Vite's ?worker import
+    visionWorkerRef.current = new VisionWorker();
 
     visionWorkerRef.current.onmessage = (e) => {
       const { status } = e.data;
-      if (status === 'ready') setVisionStatus('ready');
+      if (status === 'ready') visionStatusRef.current = 'ready';
     };
 
     return () => {
@@ -61,7 +60,8 @@ export default function ScannerPage() {
     };
 
     const processFrame = async () => {
-      if (!videoRef.current || !scanning || visionStatus !== 'ready' || isProcessing) {
+      // Use the ref so we don't need visionStatus in the useEffect dependencies
+      if (!videoRef.current || !scanning || visionStatusRef.current !== 'ready' || isProcessing) {
         if (scanning) loopId = requestAnimationFrame(processFrame);
         return;
       }
@@ -179,7 +179,7 @@ export default function ScannerPage() {
       if (stream) stream.getTracks().forEach(t => t.stop());
       if (loopId) cancelAnimationFrame(loopId);
     };
-  }, [navigate, scanning, visionStatus, cvReady]);
+  }, [navigate, scanning, cvReady]);
 
   if (error) {
     return (
