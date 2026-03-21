@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Usamos Variaveis de Ambiente do Vite para esconder a chave!
 const SUPABASE_URL = 'https://nucbuxckedidwpsaenmz.supabase.co';
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'CHAVE_FALTANDO_NO_ENV_LOCAL_ADICIONAR_PARA_FUNCIONAR';
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export const searchAutocomplete = async (term) => {
