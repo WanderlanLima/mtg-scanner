@@ -1,11 +1,31 @@
-export function findCardContour(videoElement, canvasObj) {
+let edgeCanvas = null;
+
+export function findCardContour(videoElement) {
   if (!window.cv || typeof window.cv.Mat !== 'function') return null;
 
   try {
-    const src = new window.cv.Mat(videoElement.videoHeight, videoElement.videoWidth, window.cv.CV_8UC4);
-    const canvasCtx = canvasObj.getContext('2d', { willReadFrequently: true });
-    canvasCtx.drawImage(videoElement, 0, 0, videoElement.videoWidth, videoElement.videoHeight);
-    const imageData = canvasCtx.getImageData(0, 0, videoElement.videoWidth, videoElement.videoHeight);
+    const MAX_DIM = 640;
+    let w = videoElement.videoWidth;
+    let h = videoElement.videoHeight;
+    let scale = 1.0;
+    
+    if (w > MAX_DIM || h > MAX_DIM) {
+      scale = Math.min(MAX_DIM / w, MAX_DIM / h);
+    }
+    
+    const procW = Math.round(w * scale);
+    const procH = Math.round(h * scale);
+    
+    if (!edgeCanvas) {
+       edgeCanvas = document.createElement('canvas');
+    }
+    edgeCanvas.width = procW;
+    edgeCanvas.height = procH;
+    
+    const src = new window.cv.Mat(procH, procW, window.cv.CV_8UC4);
+    const canvasCtx = edgeCanvas.getContext('2d', { willReadFrequently: true });
+    canvasCtx.drawImage(videoElement, 0, 0, procW, procH);
+    const imageData = canvasCtx.getImageData(0, 0, procW, procH);
     src.data.set(imageData.data);
 
     const gray = new window.cv.Mat();
@@ -23,11 +43,12 @@ export function findCardContour(videoElement, canvasObj) {
 
     let maxArea = 0;
     let bestPoly = null;
+    const minCardArea = (procW * procH) * 0.1; // minimum 10% of screen area
 
     for (let i = 0; i < contours.size(); ++i) {
       const cnt = contours.get(i);
       const area = window.cv.contourArea(cnt);
-      if (area > 30000) { // minimum area for a card
+      if (area > minCardArea) {
         const peri = window.cv.arcLength(cnt, true);
         const approx = new window.cv.Mat();
         window.cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
@@ -49,7 +70,10 @@ export function findCardContour(videoElement, canvasObj) {
       const points = [];
       const data32S = bestPoly.data32S;
       for (let i = 0; i < 4; i++) {
-        points.push({ x: data32S[i * 2], y: data32S[i * 2 + 1] });
+        points.push({ 
+          x: Math.round(data32S[i * 2] / scale), 
+          y: Math.round(data32S[i * 2 + 1] / scale) 
+        });
       }
       bestPoly.delete();
       return points;

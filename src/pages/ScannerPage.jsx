@@ -27,6 +27,9 @@ export default function ScannerPage() {
     let w = null;
     const initWorker = async () => {
       w = await createWorker('eng');
+      await w.setParameters({
+        tessedit_char_whitelist: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ ,-'"
+      });
       setWorker(w);
     };
     initWorker();
@@ -83,7 +86,7 @@ export default function ScannerPage() {
       }
 
       // 1. Detect contour via OpenCV
-      const points = findCardContour(videoRef.current, processCanvasRef.current);
+      const points = findCardContour(videoRef.current);
       
       const ctx = canvasRef.current.getContext('2d');
       ctx.clearRect(0, 0, w, h);
