@@ -1,17 +1,22 @@
 export function processImageForOCR(videoElement) {
   const canvas = document.createElement('canvas');
-  // Crop top 20% of the video standard
-  const width = videoElement.videoWidth;
-  const height = videoElement.videoHeight * 0.2; // top 20%
-  canvas.width = width;
-  canvas.height = height;
+  const w = videoElement.videoWidth;
+  const h = videoElement.videoHeight;
+  
+  // Crop a region in the upper-middle where the card name actually overlays natively
+  const cropW = w * 0.8;
+  const cropH = h * 0.4;
+  const startX = (w - cropW) / 2;
+  const startY = h * 0.15; // 15% from the top matches the visual reading frame much better
+  
+  canvas.width = cropW;
+  canvas.height = cropH;
   
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  // Draw only the top 20% of the video to the canvas
-  ctx.drawImage(videoElement, 0, 0, width, height, 0, 0, width, height);
+  ctx.drawImage(videoElement, startX, startY, cropW, cropH, 0, 0, cropW, cropH);
   
-  // Grayscale and Contrast Filter
-  const imageData = ctx.getImageData(0, 0, width, height);
+  // Gentle Grayscale, removing the harsh black/white thresholding that ruins PC Monitors subpixels (moiré)
+  const imageData = ctx.getImageData(0, 0, cropW, cropH);
   const data = imageData.data;
   
   for (let i = 0; i < data.length; i += 4) {
@@ -19,15 +24,13 @@ export function processImageForOCR(videoElement) {
     const g = data[i+1];
     const b = data[i+2];
     
-    // Grayscale
-    let v = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    // Luminance grayscale
+    let v = 0.299 * r + 0.587 * g + 0.114 * b;
     
-    // Contrast
-    const factor = (259 * (128 + 255)) / (255 * (259 - 128));
+    // Mild contrast increase
+    const factor = (259 * (64 + 255)) / (255 * (259 - 64)); 
     v = factor * (v - 128) + 128;
-    
-    // Threshold to black/white
-    v = v > 120 ? 255 : 0;
+    v = Math.max(0, Math.min(255, v));
     
     data[i] = data[i+1] = data[i+2] = v;
   }

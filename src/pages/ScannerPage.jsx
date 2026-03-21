@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Tesseract from 'tesseract.js';
+import { createWorker } from 'tesseract.js';
 import ScannerOverlay from '../components/ScannerOverlay';
 import { processImageForOCR } from '../utils/imageProcessing';
 import { fetchCardByName } from '../services/api';
@@ -10,10 +10,24 @@ export default function ScannerPage() {
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [scanning, setScanning] = useState(true);
+  const [worker, setWorker] = useState(null);
+
+  useEffect(() => {
+    let w = null;
+    const initWorker = async () => {
+      w = await createWorker('eng');
+      setWorker(w);
+    };
+    initWorker();
+    return () => {
+      if (w) w.terminate();
+    };
+  }, []);
 
   useEffect(() => {
     let stream = null;
-    let intervalId = null;
+    let isProcessing = false;
+    let loopId = null;
 
     const startCamera = async () => {
       try {
@@ -29,39 +43,54 @@ export default function ScannerPage() {
     };
 
     const processFrame = async () => {
-      if (!videoRef.current || !scanning) return;
-      // Make sure video is ready
-      if (videoRef.current.videoWidth === 0) return;
+      if (!videoRef.current || !scanning || !worker || isProcessing) {
+        if (scanning) loopId = setTimeout(processFrame, 500);
+        return;
+      }
       
+      if (videoRef.current.videoWidth === 0) {
+        loopId = setTimeout(processFrame, 500);
+        return;
+      }
+      
+      isProcessing = true;
       const imageSrc = processImageForOCR(videoRef.current);
+      
       try {
-        const result = await Tesseract.recognize(imageSrc, 'eng');
-        const text = result.data.text;
+        const result = await worker.recognize(imageSrc);
+        const lines = result.data.text.split('\n');
         
-        // Clean text (alphanumeric, spaces, basic punctuation for card names)
-        const cleanText = text.replace(/[^a-zA-Z\s,']/g, '').trim();
-        if (cleanText.length > 3) {
-          console.log("OCR Detected:", cleanText);
-          const card = await fetchCardByName(cleanText);
-          if (card) {
-            setScanning(false);
-            navigate(`/card/${encodeURIComponent(card.name)}`);
-          }
+        for (let line of lines) {
+            const cleanText = line.replace(/[^a-zA-Z\s,\-']/g, '').trim();
+            if (cleanText.length > 3) {
+              console.log("OCR Detected:", cleanText);
+              const card = await fetchCardByName(cleanText);
+              if (card && !card.error) {
+                setScanning(false);
+                navigate(`/card/${encodeURIComponent(card.name)}`);
+                isProcessing = false;
+                return;
+              }
+            }
         }
       } catch (err) {
         console.error('OCR Error:', err);
       }
+      
+      isProcessing = false;
+      if (scanning) loopId = setTimeout(processFrame, 800);
     };
 
     startCamera().then(() => {
-      intervalId = setInterval(processFrame, 1500); // scan every 1.5s
+      loopId = setTimeout(processFrame, 1500);
     });
 
     return () => {
+      isProcessing = true;
       if (stream) stream.getTracks().forEach(t => t.stop());
-      if (intervalId) clearInterval(intervalId);
+      if (loopId) clearTimeout(loopId);
     };
-  }, [navigate, scanning]);
+  }, [navigate, scanning, worker]);
 
   if (error) {
     return (
@@ -75,13 +104,7 @@ export default function ScannerPage() {
 
   return (
     <div className="fixed inset-0 bg-black z-50">
-      <video 
-        ref={videoRef} 
-        autoPlay 
-        playsInline 
-        muted 
-        className="w-full h-full object-cover"
-      />
+      <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
       <ScannerOverlay onCancel={() => navigate('/')} />
     </div>
   );
