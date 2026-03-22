@@ -78,31 +78,23 @@ export const fetchCardById = async (scryfallId) => {
   }
 };
 
-// Pinecone Serverless Vector Search
+// Pinecone Serverless Vector Search via Cloudflare Edge Function Proxy!
 export const matchCardByEmbedding = async (embeddingArray) => {
   try {
-    // Validação PWA: Se não houver configuração, nem enviamos a foto pro lixo
-    if (!PINECONE_HOST || !PINECONE_API_KEY) {
-      console.warn("Chaves Pinecone ausentes no .env.local!");
-      return null;
-    }
-
-    const res = await fetch(`${PINECONE_HOST}/query`, {
+    // Chamada blindada pro nosso próprio servidor Cloudflare, evitando bloqueio de CORS do Navegador 
+    const res = await fetch('/api/query', {
       method: 'POST',
       headers: {
-        'Api-Key': PINECONE_API_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        vector: embeddingArray,
-        topK: 1, // Retorna apenas a carta com maior grau de certeza
-        includeMetadata: true // Baixa os dados da carta anexados ao bloco matemático
+        vector: embeddingArray
       })
     });
 
     if (!res.ok) {
        const alertErr = await res.text();
-       throw new Error(`Pinecone Server Error: ${alertErr}`);
+       throw new Error(`Cloudflare Edge Server Error: ${alertErr}`);
     }
     
     const json = await res.json();
