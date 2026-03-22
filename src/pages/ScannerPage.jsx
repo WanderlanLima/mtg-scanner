@@ -35,10 +35,14 @@ export default function ScannerPage() {
 
     visionWorkerRef.current = new VisionWorker();
     visionWorkerRef.current.onmessage = (e) => {
-      const { status } = e.data;
+      const { status, message } = e.data;
+      
       if (status === 'ready') {
          visionStatusRef.current = 'ready';
          setVisionStatus('ready');
+      } else if (status === 'error') {
+         setVisionStatus('error');
+         setError(`Terminal IA Crash: ${message || 'Erro Desconhecido'}`);
       }
     };
 
