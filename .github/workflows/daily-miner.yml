@@ -1,10 +1,8 @@
-name: 🤖 MTG Daily Vector Miner
+name: 🤖 MTG Daily Pinecone Miner
 
 on:
   schedule:
-    # Roda todos os dias às 03:00 da manhã UTC (Meia Noite horário do Brasil)
     - cron: '0 3 * * *'
-  # Permite que você acione o robô manualmente no GitHub (Actions > Run Workflow)
   workflow_dispatch: 
 
 jobs:
@@ -12,19 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout do Código
+      - name: Checkout Código do Repositório
         uses: actions/checkout@v4
 
-      - name: Configurar Motor V8 (Node.js)
+      - name: Configurar Node.js (Motor V8)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Instalar Dependências Base (Supabase e Transformers.js)
+      - name: Instalar Inteligência Pinecone Database
         run: npm install
 
-      - name: Iniciar Extração Vetorial
+      - name: Rodar Minerador Autônomo
         env:
-          # Injeta a senha suprema trancada no Cofre de Segurança do Github de forma invisível
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          # Senha segura oculta no Cofre do Banco de Dados
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
         run: node miner.mjs

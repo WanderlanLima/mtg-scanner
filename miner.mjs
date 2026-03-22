@@ -1,96 +1,107 @@
-import { createClient } from '@supabase/supabase-js';
+import { Pinecone } from '@pinecone-database/pinecone';
 import { pipeline, env } from '@xenova/transformers';
 
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
-const SUPABASE_URL = 'https://nucbuxckedidwpsaenmz.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || '';
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const PINECONE_API_KEY = process.env.PINECONE_API_KEY || '';
+
+// Initialize Pinecone Client
+const pc = new Pinecone({ apiKey: PINECONE_API_KEY });
+const index = pc.index('mtg-cards');
 
 // Allow Node.js to download external model and process locally
 env.allowLocalModels = false;
 
 async function mineData() {
-  console.log('🤖 Inicializando Robô de Mineração Hashing MTG...');
+  console.log('🤖 Inicializando Robô de Mineração Hashing MTG Serverless (PINECONE)...');
   
+  if (!PINECONE_API_KEY) {
+     console.error("❌ ERRO: PINECONE_API_KEY não encontrada no .env.local!");
+     return;
+  }
+
   console.log('📦 Baixando e aquecendo Modelo de IA Visual (Xenova/clip-vit-base-patch32) na CPU...');
-  // Model specifically extracts 512 dimensions from an image
   const extractor = await pipeline('image-feature-extraction', 'Xenova/clip-vit-base-patch32', { quantized: true });
   
   console.log('🗃️ Interrogando Scryfall Bulk Data...');
   const bulkRes = await fetch('https://api.scryfall.com/bulk-data/default-cards');
   const bulkData = await bulkRes.json();
   
-  console.log(`📥 Baixando catálogo integral (${bulkData.download_uri})... Pode demorar alguns segundos/minutos o carregamento do JSON em memória.`);
+  console.log(`📥 Baixando catálogo integral... Pode demorar alguns segundos/minutos.`);
   const cardsRes = await fetch(bulkData.download_uri);
   const cards = await cardsRes.json();
   
-  console.log(`✅ ${cards.length} cartas lidas no JSON Mestre. Filtrando apenas as que possuem Artes Digitais...`);
   const validCards = cards.filter(c => c.image_uris && c.image_uris.normal);
   
-  // ALERTA DE CARGA MASSIVA: Limite foi removido. Processando o catálogo integral!
+  // Limite foi removido. Processando o catálogo integral!
   const LIMIT = validCards.length;
-  console.log(`🚀 Iniciando o processamento Lote em Massa (Processando TODAS as ${LIMIT} cartas)...`);
+  console.log(`🚀 Preparando Lote de ${LIMIT} cartas...`);
   
-  console.log('🔍 Consultando Supabase para descobrir quais cartas já existem no seu banco...');
+  console.log('🔍 Consultando Pinecone para executar Delta Sync...');
   const existingIds = new Set();
-  // Supabase limits select to 1000 rows by default, we need to paginate to get all 80k
-  let hasMore = true;
-  let offset = 0;
-  while (hasMore) {
-    const { data, error } = await supabase.from('mtg_cards').select('scryfall_id').range(offset, offset + 999);
-    if (error) { console.error("Erro ao ler banco:", error); break; }
-    data.forEach(row => existingIds.add(row.scryfall_id));
-    if (data.length === 1000) offset += 1000; else hasMore = false;
+  try {
+     let next = undefined;
+     do {
+       // listPaginated retrieves all IDs without blowing up memory
+       const res = await index.listPaginated({ paginationToken: next });
+       if (res.vectors) res.vectors.forEach(v => existingIds.add(v.id));
+       next = res.pagination?.next;
+     } while (next);
+     console.log(`⚡ ${existingIds.size} cartas identificadas na Nuvem Pinecone! Aceleração ativada.`);
+  } catch(e) { 
+     console.log("⚡ Aviso Pinecone: Banco Vazio ou recém-criado (Ignorando Pulos)."); 
   }
-  console.log(`⚡ ${existingIds.size} cartas já existem na Nuvem! Elas serão puladas em frações de segundo.`);
   
   let successCount = 0;
-  let skippedCount = 0;
+  let batch = [];
   
   for (let i = 0; i < LIMIT; i++) {
     const card = validCards[i];
     
-    // DELTA SYNC: Pula a carta se ela já foi minerada antes!
-    if (existingIds.has(card.id)) {
-      skippedCount++;
-      // Apenas não flodar a tela para pular:
-      // console.log(`[${i+1}/${LIMIT}] ⏭️ Pulo Rápido: ${card.name} já existe.`);
-      continue;
-    }
+    // DELTA SYNC PINECONE: Pular Rápido
+    if (existingIds.has(card.id)) continue;
 
     console.log(`[${i+1}/${LIMIT}] Desmontando NOVA Carta: ${card.name} (${card.set.toUpperCase()})`);
     
     try {
-      // Extract Mathematical Vector Embedding directly from Scryfall CDN image string
       const output = await extractor(card.image_uris.normal);
-      // Data is returned as a Float32Array Tensor. Convert to Array of 512 items
       const embedding = Array.from(output.data);
       
-      // Upload via POST directly to Supabase Postgres (Requires proper schema existing)
-      const { error } = await supabase
-        .from('mtg_cards')
-        .upsert({
-          scryfall_id: card.id,
-          oracle_id: card.oracle_id,
-          name: card.name,
-          lang: card.lang,
-          set_code: card.set,
-          collector_number: card.collector_number,
-          image_url: card.image_uris.normal,
-          image_embedding: embedding
-        }, { onConflict: 'scryfall_id' });
-        
-      if (error) throw error;
+      batch.push({
+          id: card.id,
+          values: embedding,
+          metadata: {
+             oracle_id: card.oracle_id || '',
+             name: card.name || '',
+             lang: card.lang || '',
+             set_code: card.set || '',
+             collector_number: card.collector_number || '',
+             image_url: card.image_uris.normal || ''
+          }
+      });
       
-      console.log(`   └─ ✅ 512 Vectors Injetados no Supabase DB!`);
-      successCount++;
+      // Upsert: Pinecone Serverless aguenta o tráfego pesado brutalmente rápido
+      if (batch.length >= 100) {
+        await index.upsert({ records: batch });
+        console.log(`   └─ ✅ LOTE COMPLETO: 100 Cartões Injetados de uma vez no Pinecone DB!`);
+        successCount += batch.length;
+        batch = []; 
+      }
     } catch (e) {
       console.error(`   └─ ❌ Erro Crítico ao processar ${card.name}:`, e.message);
+      // Se estourar a memória ou dar erro no index, limpa a caixa pra não quebrar as próximas cartas!
+      if (batch.length >= 100) batch = [];
     }
   }
   
-  console.log(`\n🎉 Robô Finalizado! ${successCount} cartas foram processadas e embutidas na nuvem comercial.`);
+  if (batch.length > 0) {
+     await index.upsert({ records: batch });
+     console.log(`   └─ ✅ LOTE FINAL: ${batch.length} Cartões Injetados Serverless!`);
+     successCount += batch.length;
+  }
+  
+  console.log(`\n🎉 Robô Finalizado! A Nuvem Infinta do Pinecone está abastecida.`);
 }
 
 mineData();
