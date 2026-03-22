@@ -66,7 +66,17 @@ export default {
       }
     }
 
-    // Caso não seja a API, deixa o motor de estáticos do Cloudflare servir o React (dist)
-    return env.ASSETS.fetch(request);
+    // Roteador Manual de Assets e Fallback do React (SPA)
+    // Buscamos o arquivo físico no repositório (ex: imagens, scripts do vite)
+    let response = await env.ASSETS.fetch(request);
+    
+    // Se o arquivo físico não existir (ex: navegou direto para /scan na barra de URL),
+    // o React precisa assumir. Devolvemos forçadamente o index.html principal!
+    if (response.status === 404) {
+      const indexUrl = new URL('/', request.url);
+      response = await env.ASSETS.fetch(new Request(indexUrl, request));
+    }
+    
+    return response;
   }
 };
