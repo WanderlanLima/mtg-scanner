@@ -1,7 +1,8 @@
 import { pipeline, env } from '@xenova/transformers';
 
-// Skip local model checks in browser since we pull from CDN
+// Configurações de Segurança e Proxy Customizado
 env.allowLocalModels = false;
+env.remoteHost = self.location.origin + '/api/hfproxy/'; // Força o tráfego da IA passar pelo nosso Backbone Anti-Bloqueio
 
 let extractor = null;
 

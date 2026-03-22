@@ -44,6 +44,28 @@ export default {
       }
     }
 
+    // Rota de Proxy Imparável para o HuggingFace (Bypass Brave Shields e CORS)
+    if (url.pathname.startsWith('/api/hfproxy/')) {
+      const targetUrl = 'https://huggingface.co/' + url.pathname.replace('/api/hfproxy/', '');
+      
+      const reqHeaders = new Headers(request.headers);
+      reqHeaders.delete("origin");
+      reqHeaders.delete("referer");
+
+      try {
+        const response = await fetch(targetUrl, { 
+          method: request.method, 
+          headers: reqHeaders 
+        });
+        
+        const newResponse = new Response(response.body, response);
+        newResponse.headers.set('Access-Control-Allow-Origin', '*');
+        return newResponse;
+      } catch(err) {
+        return new Response(err.message, { status: 500 });
+      }
+    }
+
     // Caso não seja a API, deixa o motor de estáticos do Cloudflare servir o React (dist)
     return env.ASSETS.fetch(request);
   }
