@@ -14,7 +14,8 @@ export default function ScannerPage() {
   const [scanning, setScanning] = useState(true);
   const [cvReady, setCvReady] = useState(false);
   const visionWorkerRef = useRef(null);
-  const visionStatusRef = useRef('loading');
+  const [visionStatus, setVisionStatus] = useState('loading');
+  const visionStatusRef = useRef('loading'); // mantemos o Ref para o requestAnimationFrame de alta velocidade
 
   // Hardwares da Câmera (Zoom e Foco)
   const trackRef = useRef(null);
@@ -35,7 +36,10 @@ export default function ScannerPage() {
     visionWorkerRef.current = new VisionWorker();
     visionWorkerRef.current.onmessage = (e) => {
       const { status } = e.data;
-      if (status === 'ready') visionStatusRef.current = 'ready';
+      if (status === 'ready') {
+         visionStatusRef.current = 'ready';
+         setVisionStatus('ready');
+      }
     };
 
     return () => {
@@ -286,6 +290,19 @@ export default function ScannerPage() {
       
       {/* Overlay Navbar Esconde Cliques, precisamos ajustar z-index ou click-through, mas no App não há botões massivos no overlay de topo */}
       <ScannerOverlay onCancel={() => navigate('/')} cvReady={cvReady} />
+
+      {/* Painel Crítico de Carregamento da Inteligência Artificial */}
+      {visionStatus === 'loading' && (
+        <div className="absolute inset-x-0 top-32 flex justify-center z-[100] px-4">
+           <div className="bg-surface-container-high/90 backdrop-blur-md px-6 py-4 rounded-3xl border border-primary/30 shadow-2xl flex items-center space-x-4 animate-pulse">
+              <span className="material-symbols-outlined text-primary text-3xl animate-spin">sync</span>
+              <div>
+                 <p className="text-on-surface font-bold text-sm">Transferindo IA Global...</p>
+                 <p className="text-on-surface-variant text-xs">Aguarde. Carregando Cérebro HuggingFace (~70MB).</p>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }
