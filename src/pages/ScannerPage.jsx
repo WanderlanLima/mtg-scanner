@@ -289,15 +289,12 @@ export default function ScannerPage() {
           const normY = y / window.innerHeight;
           constraint.pointsOfInterest = [{ x: normX, y: normY }];
         }
-       try {
-      await trackRef.current.applyConstraints({
-         advanced: [{ focusMode: 'single-shot', pointsOfInterest: [{x, y}] }]
-      });
-    } catch (err) {}
-    
-    setTimeout(() => setFocusIndicator(null), 1000);
+        
+        await trackRef.current.applyConstraints({ advanced: [constraint] });
+      } catch(err) {} 
+    }
 
-    // Força o disparo da Foto Instantaneamente (Para ignorar estabilização se travar em telas piscantes do PC)
+    // Força o disparo da Foto Instantaneamente (Ignora estabilização do OpenCV para focar em Telas que piscam!)
     forceScanRef.current = true;
   };
 
