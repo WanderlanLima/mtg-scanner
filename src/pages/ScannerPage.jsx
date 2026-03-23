@@ -68,43 +68,32 @@ export default function ScannerPage() {
 
     const startCamera = async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } 
+        // Exige a maior resolução absoluta que o celular suporta (4K/1080p)
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+             facingMode: 'environment', 
+             width: { ideal: 4096 }, 
+             height: { ideal: 2160 } 
+          }
         });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
 
-        // Pega os controles avançados da lente
+        // Pega os controles da lente para ativar Pinch-to-Zoom e Tap-to-Focus sem destruir a qualidade base
         const [track] = stream.getVideoTracks();
         trackRef.current = track;
 
-        // Aguarda a câmera estabilizar pra extrair capacidades suportadas do celular
         setTimeout(async () => {
            try {
              const capabilities = track.getCapabilities();
-             let constraints = {};
-             
-             // 1. Zomm Automático (Como o Manabox faz) para evitar que o usuário afaste muito o celular
              if (capabilities.zoom) {
-                const idealZoom = Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, capabilities.zoom.min + 0.8));
                 setZoomVars({
                    min: capabilities.zoom.min || 1,
                    max: capabilities.zoom.max || 5,
                    step: capabilities.zoom.step || 0.1
                 });
-                zoomValueRef.current = idealZoom;
-                constraints.zoom = idealZoom;
-             }
-
-             // 2. Compensação de Exposição: Escurece a câmera nativamente para evitar estouro de luz de monitores
-             if (capabilities.exposureCompensation) {
-                 // Tenta reduzir a exposição (brilho) em uns -1.0 graus se o celular permitir
-                 constraints.exposureCompensation = Math.max(capabilities.exposureCompensation.min, -1.0);
-             }
-             
-             if (Object.keys(constraints).length > 0) {
-                 await track.applyConstraints({ advanced: [constraints] });
+                zoomValueRef.current = capabilities.zoom.min || 1;
              }
            } catch(e) {}
         }, 500);
