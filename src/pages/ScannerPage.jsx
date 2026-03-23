@@ -23,6 +23,7 @@ export default function ScannerPage() {
   const zoomValueRef = useRef(1);
   const initialTouchDistRef = useRef(0);
   const [focusIndicator, setFocusIndicator] = useState(null); // {x, y}
+  const [debugImage, setDebugImage] = useState(null); // Mini-mapa do Frame da IA
 
   useEffect(() => {
     // Verifica Lente OpenCV
@@ -166,21 +167,34 @@ export default function ScannerPage() {
                     const fullCard = await fetchCardById(match.scryfall_id);
                     if (fullCard && !fullCard.error) {
                        setScanning(false);
-                       navigate(`/card/${encodeURIComponent(fullCard.name)}`);
-                       resolve(true);
-                       return;
-                    }
+              const { status, embedding, message } = e.data;
+              visionWorkerRef.current.removeEventListener('message', onWorkerMessage);
+              
+              if (status === 'success') {
+                const match = await matchCardByEmbedding(embedding);
+                if (match) {
+                  const fullCard = await fetchCardById(match.scryfall_id);
+                  if (fullCard && !fullCard.error) {
+                    setScanning(false);
+                    navigate(`/card/${encodeURIComponent(fullCard.name)}`);
+                    resolve(true);
+                    return;
                   }
-               }
-               resolve(false); 
+                }
+              }
+              resolve(false); 
             };
             
             visionWorkerRef.current.addEventListener('message', onWorkerMessage);
             visionWorkerRef.current.postMessage({ imageBase64: warpedImageSrc });
-         });
-         
-         const matched = await processVision;
-         if (matched) return; 
+          });
+          
+          const matched = await processVision;
+          if (matched) {
+            isProcessing = false; // Ensure processing flag is reset if we navigate away
+            return; 
+          }
+        }
       }
       
       isProcessing = false;
@@ -294,6 +308,14 @@ export default function ScannerPage() {
       
       {/* Overlay Navbar Esconde Cliques, precisamos ajustar z-index ou click-through, mas no App não há botões massivos no overlay de topo */}
       <ScannerOverlay onCancel={() => navigate('/')} cvReady={cvReady} />
+
+      {/* Mini-Mapa de Debug (Visão da IA) */}
+      {debugImage && (
+        <div className="absolute bottom-6 right-6 z-50 pointer-events-none border-2 border-primary rounded-lg overflow-hidden shadow-2xl bg-black">
+          <img src={debugImage} alt="Visão IA" className="w-24 h-auto opacity-90" />
+          <div className="bg-black/80 text-[10px] text-white text-center py-1">FRAME IA</div>
+        </div>
+      )}
 
       {/* Painel Crítico de Carregamento da Inteligência Artificial */}
       {visionStatus === 'loading' && (
