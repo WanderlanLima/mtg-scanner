@@ -80,16 +80,31 @@ export default function ScannerPage() {
         trackRef.current = track;
 
         // Aguarda a câmera estabilizar pra extrair capacidades suportadas do celular
-        setTimeout(() => {
+        setTimeout(async () => {
            try {
              const capabilities = track.getCapabilities();
+             let constraints = {};
+             
+             // 1. Zomm Automático (Como o Manabox faz) para evitar que o usuário afaste muito o celular
              if (capabilities.zoom) {
+                const idealZoom = Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, capabilities.zoom.min + 0.8));
                 setZoomVars({
                    min: capabilities.zoom.min || 1,
                    max: capabilities.zoom.max || 5,
                    step: capabilities.zoom.step || 0.1
                 });
-                zoomValueRef.current = capabilities.zoom.min || 1;
+                zoomValueRef.current = idealZoom;
+                constraints.zoom = idealZoom;
+             }
+
+             // 2. Compensação de Exposição: Escurece a câmera nativamente para evitar estouro de luz de monitores
+             if (capabilities.exposureCompensation) {
+                 // Tenta reduzir a exposição (brilho) em uns -1.0 graus se o celular permitir
+                 constraints.exposureCompensation = Math.max(capabilities.exposureCompensation.min, -1.0);
+             }
+             
+             if (Object.keys(constraints).length > 0) {
+                 await track.applyConstraints({ advanced: [constraints] });
              }
            } catch(e) {}
         }, 500);
@@ -98,6 +113,9 @@ export default function ScannerPage() {
         setError('Não foi possível acessar a câmera.');
       }
     };
+
+    let smoothedPoints = null;
+    let memoryFrames = 0; // Fantasma da carta (se perder de vista por piscar a tela)
 
     const processFrame = async () => {
       if (!videoRef.current || !scanning || visionStatusRef.current !== 'ready' || isProcessing) {
@@ -123,7 +141,32 @@ export default function ScannerPage() {
       }
 
       // 1. Detecta contornos pela lente
-      let points = findCardContour(videoRef.current);
+      let rawPoints = findCardContour(videoRef.current);
+      
+      // Memória Fantasma: Se o OpenCV piscar e perder a carta, mantém a caixa colada ali por 5 frames 
+      if (!rawPoints && smoothedPoints && memoryFrames < 5) {
+         rawPoints = smoothedPoints;
+         memoryFrames++;
+      } else if (rawPoints) {
+         memoryFrames = 0;
+      }
+      
+      // Interpolador Low-Pass Filter: Faz a caixa "Suave" (desliza grudada igual app Nativo)
+      let points = null;
+      if (rawPoints) {
+         if (!smoothedPoints) {
+            smoothedPoints = rawPoints;
+         } else {
+            for (let i = 0; i < 4; i++) {
+               // 70% de onde estava, 30% pra onde vai = Movimento Manteiga
+               smoothedPoints[i].x = smoothedPoints[i].x * 0.70 + rawPoints[i].x * 0.30;
+               smoothedPoints[i].y = smoothedPoints[i].y * 0.70 + rawPoints[i].y * 0.30;
+            }
+         }
+         points = smoothedPoints;
+      } else {
+         smoothedPoints = null;
+      }
       
       const ctx = canvasRef.current.getContext('2d');
       ctx.clearRect(0, 0, w, h);
@@ -136,7 +179,7 @@ export default function ScannerPage() {
          const ch = cw * 1.4; 
          const cx = (w - cw) / 2;
          const cy = (h - ch) / 2;
-         points = [
+         const drawPoints = [
             {x: cx, y: cy},
             {x: cx + cw, y: cy},
             {x: cx + cw, y: cy + ch},
