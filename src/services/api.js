@@ -100,8 +100,9 @@ export const matchCardByEmbedding = async (embeddingArray) => {
     const json = await res.json();
     
     if (json.matches && json.matches.length > 0) {
-       // Filter matches with at least 50% feature structural similarity
-       const candidates = json.matches.filter(m => m.score >= 0.50);
+       // DEBUG ABSOLUTO: Aceita literalmente QUALQUER carta, mesmo que a IA ache que a foto do monitor seja horrível.
+       // Isso força a bandeja a aparecer na tela pra provar a conectividade!
+       const candidates = json.matches;
        
        if (candidates.length > 0) {
           // Retorna múltiplos candidatos para Hybrid Matching Visual
