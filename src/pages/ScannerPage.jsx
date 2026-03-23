@@ -167,34 +167,24 @@ export default function ScannerPage() {
                     const fullCard = await fetchCardById(match.scryfall_id);
                     if (fullCard && !fullCard.error) {
                        setScanning(false);
-              const { status, embedding, message } = e.data;
-              visionWorkerRef.current.removeEventListener('message', onWorkerMessage);
-              
-              if (status === 'success') {
-                const match = await matchCardByEmbedding(embedding);
-                if (match) {
-                  const fullCard = await fetchCardById(match.scryfall_id);
-                  if (fullCard && !fullCard.error) {
-                    setScanning(false);
-                    navigate(`/card/${encodeURIComponent(fullCard.name)}`);
-                    resolve(true);
-                    return;
+                       navigate(`/card/${encodeURIComponent(fullCard.name)}`);
+                       resolve(true);
+                       return;
+                    }
                   }
-                }
-              }
-              resolve(false); 
+               }
+               resolve(false); 
             };
             
             visionWorkerRef.current.addEventListener('message', onWorkerMessage);
             visionWorkerRef.current.postMessage({ imageBase64: warpedImageSrc });
-          });
-          
-          const matched = await processVision;
-          if (matched) {
-            isProcessing = false; // Ensure processing flag is reset if we navigate away
-            return; 
-          }
-        }
+         });
+         
+         const matched = await processVision;
+         if (matched) {
+           isProcessing = false;
+           return; 
+         }
       }
       
       isProcessing = false;
