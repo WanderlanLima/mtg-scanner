@@ -22,6 +22,7 @@ export default function ScannerPage() {
   const [zoomVars, setZoomVars] = useState({ min: 1, max: 1, step: 0.1 });
   const zoomValueRef = useRef(1);
   const initialTouchDistRef = useRef(0);
+  const forceScanRef = useRef(false); // Override manual para disparar a foto
   const [focusIndicator, setFocusIndicator] = useState(null); // {x, y}
   const [debugImage, setDebugImage] = useState(null); // Mini-mapa do Frame da IA
   const [topMatches, setTopMatches] = useState([]); // Array de top predictions da IA
@@ -175,16 +176,17 @@ export default function ScannerPage() {
         ctx.lineWidth = 6;
         ctx.strokeStyle = isStabilized ? '#00ff00' : '#46eae5';
         ctx.stroke();
-        ctx.fillStyle = isStabilized ? 'rgba(0, 255, 0, 0.4)' : 'rgba(70, 234, 229, 0.2)';
+        ctx.fillStyle = (isStabilized || forceScanRef.current) ? 'rgba(0, 255, 0, 0.4)' : 'rgba(70, 234, 229, 0.2)';
         ctx.fill();
       }
 
-      if (!isStabilized) {
+      if (!isStabilized && !forceScanRef.current) {
         if (scanning) setTimeout(() => { loopId = requestAnimationFrame(processFrame); }, 50);
         return;
       }
       
       stableFramesCount = 0;
+      forceScanRef.current = false; // Consome o disparo manual overrides
       const warpedImageSrc = warpCardPerspective(videoRef.current, processCanvasRef.current, points);
       
       if (warpedImageSrc && visionWorkerRef.current) {
@@ -287,10 +289,16 @@ export default function ScannerPage() {
           const normY = y / window.innerHeight;
           constraint.pointsOfInterest = [{ x: normX, y: normY }];
         }
-        
-        await trackRef.current.applyConstraints({ advanced: [constraint] });
-      } catch(err) {} 
-    }
+       try {
+      await trackRef.current.applyConstraints({
+         advanced: [{ focusMode: 'single-shot', pointsOfInterest: [{x, y}] }]
+      });
+    } catch (err) {}
+    
+    setTimeout(() => setFocusIndicator(null), 1000);
+
+    // Força o disparo da Foto Instantaneamente (Para ignorar estabilização se travar em telas piscantes do PC)
+    forceScanRef.current = true;
   };
 
   if (error) {
