@@ -93,15 +93,18 @@ export const matchCardByEmbedding = async (embeddingArray) => {
     });
 
     if (!res.ok) {
-       const alertErr = await res.text();
-       throw new Error(`Cloudflare Edge Server Error: ${alertErr}`);
+      const errText = await res.text();
+      console.error("Pinecone Query failed:", errText);
+      throw new Error(`Pinecone Server Error: ${res.status}`);
     }
     
     const json = await res.json();
     
-    if (json.matches && json.matches.length > 0) {
-       // DEBUG ABSOLUTO: Aceita literalmente QUALQUER carta, mesmo que a IA ache que a foto do monitor seja horrível.
-       // Isso força a bandeja a aparecer na tela pra provar a conectividade!
+    if (json.matches) {
+       if (json.matches.length === 0) {
+          throw new Error("Banco de Dados Pinecone está VAZIO! Você precisa rodar o miner.mjs.");
+       }
+       
        const candidates = json.matches;
        
        if (candidates.length > 0) {
@@ -116,10 +119,9 @@ export const matchCardByEmbedding = async (embeddingArray) => {
           }));
        }
     }
-    return null;
-
-  } catch (err) {
-    console.error('Pinecone Math Engine Error:', err);
-    throw err;
+    throw new Error("Resposta inválida do Pinecone.");
+  } catch (error) {
+    console.error("Vector Search Error:", error);
+    throw error; // Repassa pro UI exibir
   }
 };

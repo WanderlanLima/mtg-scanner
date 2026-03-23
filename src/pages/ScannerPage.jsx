@@ -26,6 +26,7 @@ export default function ScannerPage() {
   const [focusIndicator, setFocusIndicator] = useState(null); // {x, y}
   const [debugImage, setDebugImage] = useState(null); // Mini-mapa do Frame da IA
   const [topMatches, setTopMatches] = useState([]); // Array de top predictions da IA
+  const [scanMessage, setScanMessage] = useState('Centralize a Arte da Carta...'); // Log em tempo real
 
   useEffect(() => {
     // Verifica Lente OpenCV
@@ -190,22 +191,30 @@ export default function ScannerPage() {
       const warpedImageSrc = warpCardPerspective(videoRef.current, processCanvasRef.current, points);
       
       if (warpedImageSrc && visionWorkerRef.current) {
+         setScanMessage("Processando Imagem na IA Local...");
          const processVision = new Promise((resolve) => {
             const onWorkerMessage = async (e) => {
                const { status, embedding, message } = e.data;
                visionWorkerRef.current.removeEventListener('message', onWorkerMessage);
                
                if (status === 'success') {
-                  const matches = await matchCardByEmbedding(embedding);
-                  if (matches && matches.length > 0) {
-                     setTopMatches(matches);
-                     isProcessing = false;
-                     // Não resolve o scan para `true` para continuarmos operando, ou resolve para `false` 
-                     // Na verdade, se encontrou as cartas, pausamos o scan e deixamos a UI decidir
-                     setScanning(false);
-                     resolve(true);
-                     return;
+                  setScanMessage("Buscando no Pinecone...");
+                  try {
+                    const matches = await matchCardByEmbedding(embedding);
+                    if (matches && matches.length > 0) {
+                       setTopMatches(matches);
+                       isProcessing = false;
+                       setScanning(false);
+                       setScanMessage("Análise Concluída.");
+                       resolve(true);
+                       return;
+                    }
+                  } catch (apiError) {
+                    setScanMessage(apiError.message);
+                    setTimeout(() => setScanMessage('Centralize a Arte da Carta...'), 4000);
                   }
+               } else {
+                  setScanMessage(`Erro na IA: ${message}`);
                }
                resolve(false); 
             };
@@ -370,6 +379,15 @@ export default function ScannerPage() {
         <div className="absolute bottom-6 right-6 z-50 pointer-events-none border-2 border-primary rounded-lg overflow-hidden shadow-2xl bg-black">
           <img src={debugImage} alt="Visão IA" className="w-24 h-auto opacity-90" />
           <div className="bg-black/80 text-[10px] text-white text-center py-1">FRAME IA</div>
+        </div>
+      )}
+      
+      {/* Console de Feedback HUD */}
+      {topMatches.length === 0 && !error && (
+        <div className="absolute top-20 left-0 right-0 z-50 flex justify-center pointer-events-none">
+           <div className="bg-black/70 backdrop-blur-md px-6 py-2 rounded-full border border-white/10 text-white font-mono text-xs shadow-xl transition-all">
+              {scanMessage}
+           </div>
         </div>
       )}
 
