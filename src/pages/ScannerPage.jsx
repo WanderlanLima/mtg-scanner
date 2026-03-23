@@ -37,9 +37,6 @@ export default function ScannerPage() {
       }
     }, 500);
 
-    let stableFramesCount = 0;
-    let lastCenter = { x: 0, y: 0 };
-
     visionWorkerRef.current = new VisionWorker();
     visionWorkerRef.current.onmessage = (e) => {
       const { status, message } = e.data;
@@ -65,6 +62,9 @@ export default function ScannerPage() {
     let stream = null;
     let isProcessing = false;
     let loopId = null;
+    
+    let stableFramesCount = 0; // Corrigido: Scope correto para o processFrame
+    let lastCenter = { x: 0, y: 0 };
 
     const startCamera = async () => {
       try {
