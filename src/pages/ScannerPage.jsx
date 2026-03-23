@@ -110,7 +110,6 @@ export default function ScannerPage() {
         return;
       }
       
-      isProcessing = true;
       const w = videoRef.current.videoWidth;
       const h = videoRef.current.videoHeight;
       
@@ -191,6 +190,7 @@ export default function ScannerPage() {
       const warpedImageSrc = warpCardPerspective(videoRef.current, processCanvasRef.current, points);
       
       if (warpedImageSrc && visionWorkerRef.current) {
+         isProcessing = true; // Trava o loop do OpenCV apenas ENQUANTO a IA pesa a foto!
          setScanMessage("Processando Imagem na IA Local...");
          const processVision = new Promise((resolve) => {
             const onWorkerMessage = async (e) => {
