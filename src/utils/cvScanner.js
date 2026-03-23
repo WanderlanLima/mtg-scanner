@@ -127,9 +127,11 @@ export function warpCardPerspective(videoElement, canvasObj, points) {
     window.cv.warpPerspective(src, dst, M, dsize, window.cv.INTER_LINEAR, window.cv.BORDER_CONSTANT, new window.cv.Scalar());
 
     // For Neural Network Embeddings, we isolate ONLY the physical Artwork!
-    // MTG Art box is roughly from Y=44px to Y=308px on a 400x560 frame.
-    const artHeight = 264;
-    const artRect = new window.cv.Rect(0, 44, w, artHeight);
+    // MTG Art box is mathematically 656x480 in Scryfall's API (Ratio 1.366).
+    // Para nosso Frame Warp (400x560): 400 / 1.366 = 293 de Altura.
+    // Começamos em Y=50 para escapar exatamente da barra de Título!
+    const artHeight = 293;
+    const artRect = new window.cv.Rect(0, 50, w, artHeight);
     const croppedArt = dst.roi(artRect);
 
     const outCanvas = document.createElement('canvas');
