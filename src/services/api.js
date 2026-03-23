@@ -100,18 +100,20 @@ export const matchCardByEmbedding = async (embeddingArray) => {
     const json = await res.json();
     
     if (json.matches && json.matches.length > 0) {
-      const match = json.matches[0];
-      // Indexação Cosine Similarity: 0.70 significa 70% de certeza e igualdade matemática visual!
-      if (match.score >= 0.70) {
-        return {
-          scryfall_id: match.id,
-          similarity: match.score,
-          oracle_id: match.metadata.oracle_id,
-          name: match.metadata.name,
-          set_code: match.metadata.set_code,
-          image_url: match.metadata.image_url
-        };
-      }
+       // Filter matches with at least 50% feature structural similarity
+       const candidates = json.matches.filter(m => m.score >= 0.50);
+       
+       if (candidates.length > 0) {
+          // Retorna múltiplos candidatos para Hybrid Matching Visual
+          return candidates.map(match => ({
+             scryfall_id: match.id,
+             similarity: match.score,
+             oracle_id: match.metadata.oracle_id,
+             name: match.metadata.name,
+             set_code: match.metadata.set_code,
+             image_url: match.metadata.image_url
+          }));
+       }
     }
     return null;
 

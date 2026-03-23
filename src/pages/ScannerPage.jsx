@@ -24,6 +24,7 @@ export default function ScannerPage() {
   const initialTouchDistRef = useRef(0);
   const [focusIndicator, setFocusIndicator] = useState(null); // {x, y}
   const [debugImage, setDebugImage] = useState(null); // Mini-mapa do Frame da IA
+  const [topMatches, setTopMatches] = useState([]); // Array de top predictions da IA
 
   useEffect(() => {
     // Verifica Lente OpenCV
@@ -162,15 +163,15 @@ export default function ScannerPage() {
                visionWorkerRef.current.removeEventListener('message', onWorkerMessage);
                
                if (status === 'success') {
-                  const match = await matchCardByEmbedding(embedding);
-                  if (match) {
-                    const fullCard = await fetchCardById(match.scryfall_id);
-                    if (fullCard && !fullCard.error) {
-                       setScanning(false);
-                       navigate(`/card/${encodeURIComponent(fullCard.name)}`);
-                       resolve(true);
-                       return;
-                    }
+                  const matches = await matchCardByEmbedding(embedding);
+                  if (matches && matches.length > 0) {
+                     setTopMatches(matches);
+                     isProcessing = false;
+                     // Não resolve o scan para `true` para continuarmos operando, ou resolve para `false` 
+                     // Na verdade, se encontrou as cartas, pausamos o scan e deixamos a UI decidir
+                     setScanning(false);
+                     resolve(true);
+                     return;
                   }
                }
                resolve(false); 
@@ -182,7 +183,6 @@ export default function ScannerPage() {
          
          const matched = await processVision;
          if (matched) {
-           isProcessing = false;
            return; 
          }
       }
@@ -299,8 +299,38 @@ export default function ScannerPage() {
       {/* Overlay Navbar Esconde Cliques, precisamos ajustar z-index ou click-through, mas no App não há botões massivos no overlay de topo */}
       <ScannerOverlay onCancel={() => navigate('/')} cvReady={cvReady} />
 
-      {/* Mini-Mapa de Debug (Visão da IA) */}
-      {debugImage && (
+      {/* Sobreposição de Dúvida da IA: Lista de Cartas Semelhantes Encontradas */}
+      {topMatches.length > 0 && !scanning && (
+        <div className="absolute inset-x-0 bottom-0 bg-surface-container-high/95 backdrop-blur-lg pt-4 pb-8 px-4 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-50 animate-in slide-in-from-bottom flex flex-col items-center">
+           <h3 className="text-on-surface text-center mb-4 font-bold flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">robot_2</span> A IA ficou na dúvida, qual delas é a sua?
+           </h3>
+           <div className="flex w-full gap-4 overflow-x-auto pb-4 snap-x">
+             {topMatches.slice(0, 10).map((card, i) => (
+               <div 
+                 key={i} 
+                 onClick={() => navigate(`/card/${encodeURIComponent(card.name)}`)}
+                 className="flex-none w-32 snap-center rounded-xl overflow-hidden cursor-pointer active:scale-95 transition-transform"
+               >
+                 <img src={card.image_url} alt={card.name} className="w-full h-44 object-cover" />
+                 <div className="bg-surface-container p-2 text-center h-full">
+                    <p className="text-xs text-on-surface font-semibold truncate leading-tight">{card.name}</p>
+                    <p className="text-[10px] text-primary">Score: {(card.similarity * 100).toFixed(1)}%</p>
+                 </div>
+               </div>
+             ))}
+           </div>
+           <button 
+             onClick={() => { setTopMatches([]); setScanning(true); }}
+             className="mt-2 bg-secondary text-on-secondary px-8 py-2 rounded-full font-bold shadow-lg"
+           >
+              Mire Novamente na Carta
+           </button>
+        </div>
+      )}
+
+      {/* Mini-Mapa de Debug (Visão da IA) - Mantido limpo quando Top Matches aparecerem */}
+      {debugImage && topMatches.length === 0 && (
         <div className="absolute bottom-6 right-6 z-50 pointer-events-none border-2 border-primary rounded-lg overflow-hidden shadow-2xl bg-black">
           <img src={debugImage} alt="Visão IA" className="w-24 h-auto opacity-90" />
           <div className="bg-black/80 text-[10px] text-white text-center py-1">FRAME IA</div>

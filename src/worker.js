@@ -20,7 +20,7 @@ export default {
           },
           body: JSON.stringify({
             vector: vector,
-            topK: 1,
+            topK: 10,
             includeMetadata: true
           })
         });
