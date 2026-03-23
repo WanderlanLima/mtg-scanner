@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScannerOverlay from '../components/ScannerOverlay';
 import { findCardContour, warpCardPerspective } from '../utils/cvScanner';
-import { fetchCardById, matchCardByEmbedding } from '../services/api';
+import { fetchCardById, hydratePhashMatches } from '../services/api';
 import VisionWorker from '../workers/visionWorker.js?worker';
 
 export default function ScannerPage() {
@@ -38,6 +38,10 @@ export default function ScannerPage() {
     }, 500);
 
     visionWorkerRef.current = new VisionWorker();
+    
+    // Inicia o download assíncrono do Banco de Hashes do Celular (~1MB)
+    visionWorkerRef.current.postMessage({ action: 'init' });
+    
     visionWorkerRef.current.onmessage = (e) => {
       const { status, message } = e.data;
       
@@ -65,6 +69,8 @@ export default function ScannerPage() {
     
     let stableFramesCount = 0; // Corrigido: Scope correto para o processFrame
     let lastCenter = { x: 0, y: 0 };
+    let smoothedPoints = null;
+    let memoryFrames = 0; // Fantasma da carta (se perder de vista por piscar a tela)
 
     const startCamera = async () => {
       try {
@@ -102,9 +108,6 @@ export default function ScannerPage() {
         setError('Não foi possível acessar a câmera.');
       }
     };
-
-    let smoothedPoints = null;
-    let memoryFrames = 0; // Fantasma da carta (se perder de vista por piscar a tela)
 
     const processFrame = async () => {
       if (!videoRef.current || !scanning || visionStatusRef.current !== 'ready' || isProcessing) {
@@ -226,22 +229,22 @@ export default function ScannerPage() {
       
       stableFramesCount = 0;
       forceScanRef.current = false; // Consome o disparo manual overrides
-      const warpedImageSrc = warpCardPerspective(videoRef.current, processCanvasRef.current, points);
+      const warpedImageSrc = warpCardPerspective(videoRef.current, processCanvasRef.current, points || drawPoints); // if points null, falls back to drawPoints
       
       if (warpedImageSrc && visionWorkerRef.current) {
          isProcessing = true; // Trava o loop do OpenCV apenas ENQUANTO a IA pesa a foto!
-         setScanMessage("Processando Imagem na IA Local...");
+         setScanMessage("Comparando Imagem Offline...");
          const processVision = new Promise((resolve) => {
             const onWorkerMessage = async (e) => {
-               const { status, embedding, message } = e.data;
+               const { status, matches, message } = e.data;
                visionWorkerRef.current.removeEventListener('message', onWorkerMessage);
                
                if (status === 'success') {
-                  setScanMessage("Buscando no Pinecone...");
+                  setScanMessage("Consultando Scryfall Database...");
                   try {
-                    const matches = await matchCardByEmbedding(embedding);
-                    if (matches && matches.length > 0) {
-                       setTopMatches(matches);
+                    const fullMatches = await hydratePhashMatches(matches);
+                    if (fullMatches && fullMatches.length > 0) {
+                       setTopMatches(fullMatches);
                        isProcessing = false;
                        setScanning(false);
                        setScanMessage("Análise Concluída.");
@@ -253,13 +256,13 @@ export default function ScannerPage() {
                     setTimeout(() => setScanMessage('Centralize a Arte da Carta...'), 4000);
                   }
                } else {
-                  setScanMessage(`Erro na IA: ${message}`);
+                  setScanMessage(`Erro na Identificação: ${message}`);
                }
                resolve(false); 
             };
             
             visionWorkerRef.current.addEventListener('message', onWorkerMessage);
-            visionWorkerRef.current.postMessage({ imageBase64: warpedImageSrc });
+            visionWorkerRef.current.postMessage({ action: 'scan', imageBase64: warpedImageSrc });
          });
          
          const matched = await processVision;

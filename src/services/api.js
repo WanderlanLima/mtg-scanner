@@ -79,49 +79,50 @@ export const fetchCardById = async (scryfallId) => {
 };
 
 // Pinecone Serverless Vector Search via Cloudflare Edge Function Proxy!
-export const matchCardByEmbedding = async (embeddingArray) => {
+export const hydratePhashMatches = async (hashMatches) => {
+  if (!hashMatches || hashMatches.length === 0) return null;
+
   try {
-    // Chamada blindada pro nosso próprio servidor Cloudflare, evitando bloqueio de CORS do Navegador 
-    const res = await fetch('/api/query', {
+    // Para buscar várias cartas no Scryfall em 1 request:
+    // POST https://api.scryfall.com/cards/collection
+    const identifiers = hashMatches.map(m => ({ id: m.id }));
+    
+    const res = await fetch('https://api.scryfall.com/cards/collection', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        vector: embeddingArray
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifiers })
     });
 
     if (!res.ok) {
-      const errText = await res.text();
-      console.error("Pinecone Query failed:", errText);
-      throw new Error(`Pinecone Server Error: ${res.status}`);
+       console.error("Scryfall Hydration failed:", res.status);
+       throw new Error("Falha ao baixar dados das cartas Gêmeas no Scryfall.");
     }
-    
+
     const json = await res.json();
     
-    if (json.matches) {
-       if (json.matches.length === 0) {
-          throw new Error("Banco de Dados Pinecone está VAZIO! Você precisa rodar o miner.mjs.");
-       }
-       
-       const candidates = json.matches;
-       
-       if (candidates.length > 0) {
-          // Retorna múltiplos candidatos para Hybrid Matching Visual
-          return candidates.map(match => ({
-             scryfall_id: match.id,
-             similarity: match.score,
-             oracle_id: match.metadata.oracle_id,
-             name: match.metadata.name,
-             set_code: match.metadata.set_code,
-             image_url: match.metadata.image_url
-          }));
-       }
+    if (json.data && json.data.length > 0) {
+       return json.data.map(card => {
+          // O Scryfall retorna a lista, mas perdemos a "distância" do pHash.
+          // Vamos re-ancorar a Distância de Hamming buscando qual match gerou esse card.
+          const originalMatch = hashMatches.find(m => m.id === card.id);
+          const distance = originalMatch ? originalMatch.distance : 0;
+          // Se a distância for 0, é 100%. Se for 12, é ~81%.
+          const score = Math.max(0, 100 - (distance * 1.56)); // 1.56 * 64 bits = ~100
+
+          return {
+             scryfall_id: card.id,
+             similarity: score / 100, 
+             oracle_id: card.oracle_id,
+             name: card.name,
+             set_code: card.set,
+             image_url: card.image_uris ? card.image_uris.normal : (card.card_faces ? card.card_faces[0].image_uris.normal : '')
+          };
+       });
     }
-    throw new Error("Resposta inválida do Pinecone.");
-  } catch (error) {
-    console.error("Vector Search Error:", error);
-    throw error; // Repassa pro UI exibir
+    
+    return null;
+  } catch (err) {
+    console.error("Hydration Error:", err);
+    throw err;
   }
 };
