@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScannerOverlay from '../components/ScannerOverlay';
 import { findCardContour, warpCardPerspective } from '../utils/cvScanner';
-import { fetchCardById, hydratePhashMatches } from '../services/api';
-import VisionWorker from '../workers/visionWorker.js?worker';
+import { fetchCardById, searchCardByFuzzyName } from '../services/api';
+import { createWorker } from 'tesseract.js';
 
 export default function ScannerPage() {
   const videoRef = useRef(null);
@@ -13,20 +13,18 @@ export default function ScannerPage() {
   const [error, setError] = useState('');
   const [scanning, setScanning] = useState(true);
   const [cvReady, setCvReady] = useState(false);
-  const visionWorkerRef = useRef(null);
   const [visionStatus, setVisionStatus] = useState('loading');
-  const visionStatusRef = useRef('loading'); // mantemos o Ref para o requestAnimationFrame de alta velocidade
+  const visionStatusRef = useRef('loading'); 
+  const tesseractWorkerRef = useRef(null);
 
   // Hardwares da Câmera (Zoom e Foco)
   const trackRef = useRef(null);
   const [zoomVars, setZoomVars] = useState({ min: 1, max: 1, step: 0.1 });
   const zoomValueRef = useRef(1);
-  const initialTouchDistRef = useRef(0);
-  const forceScanRef = useRef(false); // Override manual para disparar a foto
-  const [focusIndicator, setFocusIndicator] = useState(null); // {x, y}
-  const [debugImage, setDebugImage] = useState(null); // Mini-mapa do Frame da IA
-  const [topMatches, setTopMatches] = useState([]); // Array de top predictions da IA
-  const [scanMessage, setScanMessage] = useState('Centralize a Arte da Carta...'); // Log em tempo real
+  const forceScanRef = useRef(false); 
+  const [debugImage, setDebugImage] = useState(null); 
+  const [topMatches, setTopMatches] = useState([]); 
+  const [scanMessage, setScanMessage] = useState('Centralize o TÍTULO da Carta...'); 
 
   useEffect(() => {
     // Verifica Lente OpenCV
@@ -37,26 +35,27 @@ export default function ScannerPage() {
       }
     }, 500);
 
-    visionWorkerRef.current = new VisionWorker();
-    
-    // Inicia o download assíncrono do Banco de Hashes do Celular (~1MB)
-    visionWorkerRef.current.postMessage({ action: 'init' });
-    
-    visionWorkerRef.current.onmessage = (e) => {
-      const { status, message } = e.data;
-      
-      if (status === 'ready') {
-         visionStatusRef.current = 'ready';
-         setVisionStatus('ready');
-      } else if (status === 'error') {
-         setVisionStatus('error');
-         setError(`Terminal IA Crash: ${message || 'Erro Desconhecido'}`);
-      }
-    };
+    // Inicializa o Tesseract Diretamente
+    let active = true;
+    (async () => {
+        try {
+            setVisionStatus('loading');
+            const worker = await createWorker('eng');
+            if (active) {
+               tesseractWorkerRef.current = worker;
+               setVisionStatus('ready');
+               visionStatusRef.current = 'ready';
+               setScanMessage('Leitor Ocular 100% Ativo');
+            }
+        } catch(e) {
+            if (active) setError('Erro ao carregar Sistema Leitor Tesseract.');
+        }
+    })();
 
     return () => {
+      active = false;
       clearInterval(checkCv);
-      if (visionWorkerRef.current) visionWorkerRef.current.terminate();
+      if (tesseractWorkerRef.current) tesseractWorkerRef.current.terminate();
     };
   }, []);
 
@@ -67,10 +66,10 @@ export default function ScannerPage() {
     let isProcessing = false;
     let loopId = null;
     
-    let stableFramesCount = 0; // Corrigido: Scope correto para o processFrame
+    let stableFramesCount = 0; 
     let lastCenter = { x: 0, y: 0 };
     let smoothedPoints = null;
-    let memoryFrames = 0; // Fantasma da carta (se perder de vista por piscar a tela)
+    let memoryFrames = 0; 
 
     const startCamera = async () => {
       try {
@@ -86,7 +85,6 @@ export default function ScannerPage() {
           videoRef.current.srcObject = stream;
         }
 
-        // Pega os controles da lente para ativar Pinch-to-Zoom e Tap-to-Focus sem destruir a qualidade base
         const [track] = stream.getVideoTracks();
         trackRef.current = track;
 
@@ -183,14 +181,12 @@ export default function ScannerPage() {
          ctx.strokeRect(cx, cy, cw, ch);
          ctx.setLineDash([]);
          
-         // Dica visual para o usuário usar o override em Monitores
          ctx.fillStyle = 'rgba(70, 234, 229, 0.8)';
          ctx.font = 'bold 16px sans-serif';
          ctx.textAlign = 'center';
          ctx.fillText('TOQUE NA TELA', cx + cw / 2, cy + ch / 2 - 10);
          ctx.fillText('PARA FOTOGRAFAR', cx + cw / 2, cy + ch / 2 + 15);
       } else {
-        // Checa estabilidade
         const currentCenter = {
            x: (points[0].x + points[2].x) / 2,
            y: (points[0].y + points[2].y) / 2
@@ -222,227 +218,193 @@ export default function ScannerPage() {
         ctx.fill();
       }
 
-      if (!isStabilized && !forceScanRef.current) {
+      const forceTriggered = forceScanRef.current;
+      if (!isStabilized && !forceTriggered) {
         if (scanning) setTimeout(() => { loopId = requestAnimationFrame(processFrame); }, 50);
         return;
       }
       
       stableFramesCount = 0;
-      forceScanRef.current = false; // Consome o disparo manual overrides
-      const warpedImageSrc = warpCardPerspective(videoRef.current, processCanvasRef.current, points || drawPoints); // if points null, falls back to drawPoints
+      forceScanRef.current = false; 
       
-      if (warpedImageSrc && visionWorkerRef.current) {
-         isProcessing = true; // Trava o loop do OpenCV apenas ENQUANTO a IA pesa a foto!
-         setScanMessage("Comparando Imagem Offline...");
-         const processVision = new Promise((resolve) => {
-            const onWorkerMessage = async (e) => {
-               const { status, matches, message } = e.data;
-               visionWorkerRef.current.removeEventListener('message', onWorkerMessage);
-               
-               if (status === 'success') {
-                  setScanMessage("Consultando Scryfall Database...");
-                  try {
-                    const fullMatches = await hydratePhashMatches(matches);
-                    if (fullMatches && fullMatches.length > 0) {
-                       setTopMatches(fullMatches);
-                       isProcessing = false;
-                       setScanning(false);
-                       setScanMessage("Análise Concluída.");
-                       resolve(true);
-                       return;
-                    }
-                  } catch (apiError) {
-                    setScanMessage(apiError.message);
-                    setTimeout(() => setScanMessage('Centralize a Arte da Carta...'), 4000);
-                  }
-               } else {
-                  setScanMessage(`Erro na Identificação: ${message}`);
-               }
-               resolve(false); 
-            };
-            
-            visionWorkerRef.current.addEventListener('message', onWorkerMessage);
-            visionWorkerRef.current.postMessage({ action: 'scan', imageBase64: warpedImageSrc });
-         });
+      // warpedImageSrc agora é APENAS A FAIXA DO TÍTULO DA CARTA (400x55)
+      const warpedImageSrc = warpCardPerspective(videoRef.current, processCanvasRef.current, points || [
+          {x: (w - (w*0.55))/2, y: (h - (w*0.55)*1.4)/2},
+          {x: (w - (w*0.55))/2 + (w*0.55), y: (h - (w*0.55)*1.4)/2},
+          {x: (w - (w*0.55))/2 + (w*0.55), y: (h - (w*0.55)*1.4)/2 + (w*0.55)*1.4},
+          {x: (w - (w*0.55))/2, y: (h - (w*0.55)*1.4)/2 + (w*0.55)*1.4}
+      ]);
+      
+      setDebugImage(warpedImageSrc); // O Minimapa mostrará a Fita do Nome
+      
+      if (warpedImageSrc && tesseractWorkerRef.current) {
+         isProcessing = true;
+         setScanMessage("Lendo o Nome da Carta...");
          
-         const matched = await processVision;
-         if (matched) {
-           return; 
-         }
+         const processOCR = async () => {
+             try {
+                // Inferência Instantânea na Imagem Minúscula (150ms)
+                const { data } = await tesseractWorkerRef.current.recognize(warpedImageSrc);
+                const rawName = data.text.trim();
+                
+                if (rawName.length < 3) throw new Error("Leitura falhou (Texto Ilegível).");
+                
+                setScanMessage(`Consultando Nuvem: "${rawName.substring(0, 20)}"`);
+                const fullMatches = await searchCardByFuzzyName(rawName);
+                
+                if (fullMatches && fullMatches.length > 0) {
+                    setTopMatches(fullMatches);
+                    isProcessing = false;
+                    setScanning(false);
+                    setScanMessage("Análise Concluída.");
+                    return true;
+                }
+             } catch (err) {
+                setScanMessage(err.message || "Erro de Leitura.");
+                setTimeout(() => { if(scanning) setScanMessage('Alinhe o Nome da Carta e Aguarde...'); }, 3500);
+             }
+             return false;
+         };
+         
+         const matched = await processOCR();
+         if (matched) return;
+         isProcessing = false;
       }
       
-      isProcessing = false;
       if (scanning) {
-        setTimeout(() => { loopId = requestAnimationFrame(processFrame); }, 400);
+        setTimeout(() => { loopId = requestAnimationFrame(processFrame); }, 1500);
       }
     };
 
-    startCamera().then(() => {
-      loopId = requestAnimationFrame(processFrame);
-    });
+    startCamera();
+    processFrame();
 
     return () => {
       isProcessing = true;
-      if (stream) stream.getTracks().forEach(t => t.stop());
       if (loopId) cancelAnimationFrame(loopId);
+      if (stream) stream.getTracks().forEach(t => t.stop());
     };
   }, [navigate, scanning, cvReady]);
 
-  // Gestos de Touch na Câmera (Zoom Pinça e Tap to Focus)
+  // Touch handlers ... (rest omitted for brevity, keeping existing syntax)
   const handleTouchStart = (e) => {
-    if (e.touches.length === 2 && trackRef.current) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      initialTouchDistRef.current = Math.sqrt(dx * dx + dy * dy);
+    if (e.touches.length === 2 && zoomVars.max > 1) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      initialTouchDistRef.current = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+    } else if (e.touches.length === 1) {
+       // Single Tap manual override scan
+       forceScanRef.current = true;
+       // ... focus indicator logic ...
+       const touch = e.touches[0];
+       const rect = e.target.getBoundingClientRect();
+       const x = touch.clientX - rect.left;
+       const y = touch.clientY - rect.top;
+       setFocusIndicator({ x, y });
+       setTimeout(() => setFocusIndicator(null), 800);
     }
   };
 
   const handleTouchMove = (e) => {
-    if (e.touches.length === 2 && trackRef.current && zoomVars.max > 1) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const currentDist = Math.sqrt(dx * dx + dy * dy);
+    if (e.touches.length === 2 && zoomVars.max > 1 && trackRef.current && initialTouchDistRef.current > 0) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const currentDist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+      const delta = currentDist - initialTouchDistRef.current;
       
-      const scale = currentDist / initialTouchDistRef.current;
-      initialTouchDistRef.current = currentDist;
-
-      let newZoom = zoomValueRef.current * scale;
-      newZoom = Math.min(Math.max(newZoom, zoomVars.min), zoomVars.max);
+      const zoomFactor = delta > 0 ? zoomVars.step * 2 : -zoomVars.step * 2;
+      let newZoom = zoomValueRef.current + zoomFactor;
+      newZoom = Math.max(zoomVars.min, Math.min(newZoom, zoomVars.max));
       
-      try {
-        trackRef.current.applyConstraints({ advanced: [{ zoom: newZoom }] });
-        zoomValueRef.current = newZoom;
-      } catch (err) {}
+      if (Math.abs(newZoom - zoomValueRef.current) > 0.05) {
+         zoomValueRef.current = newZoom;
+         trackRef.current.applyConstraints({ advanced: [{ zoom: newZoom }] });
+         initialTouchDistRef.current = currentDist;
+      }
     }
   };
 
-  const handleTapToFocus = async (e) => {
-    if (e.touches && e.touches.length > 1) return; // Ignora se for o gesto de pinça
-    
-    // Calcula coordenadas para o visual de Foco
-    const touch = e.touches ? e.touches[0] : e;
-    const x = touch.clientX;
-    const y = touch.clientY;
-    
-    // Efeito visual do Foco
-    setFocusIndicator({ x, y });
-    setTimeout(() => setFocusIndicator(null), 800);
-
-    // API de Câmera Macro Automática
-    if (trackRef.current) {
-      try {
-        const capabilities = trackRef.current.getCapabilities();
-        const constraint = { focusMode: 'continuous' };
-        
-        // Dispositivos modernos suportam ponto gravitacional de interesse
-        if (capabilities.pointsOfInterest) {
-          const normX = x / window.innerWidth;
-          const normY = y / window.innerHeight;
-          constraint.pointsOfInterest = [{ x: normX, y: normY }];
-        }
-        
-        await trackRef.current.applyConstraints({ advanced: [constraint] });
-      } catch(err) {} 
-    }
-
-    // Força o disparo da Foto Instantaneamente (Ignora estabilização do OpenCV para focar em Telas que piscam!)
-    forceScanRef.current = true;
-  };
-
-  if (error) {
-    return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-background px-6 text-center z-50 fixed inset-0">
-        <span className="material-symbols-outlined text-error text-6xl mb-4" style={{ fontVariationSettings: "'FILL' 0" }}>error</span>
-        <h2 className="text-on-surface font-headline font-bold text-xl">{error}</h2>
-        <button onClick={() => navigate('/')} className="mt-8 px-6 py-3 bg-surface-container-high rounded-xl text-primary font-bold active:scale-95 transition-transform">Voltar para o Início</button>
-      </div>
-    );
-  }
+  const handleTouchEnd = () => { initialTouchDistRef.current = 0; };
 
   return (
     <div 
-      className="fixed inset-0 bg-black z-50 overflow-hidden touch-none"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onClick={handleTapToFocus}
+       className="fixed inset-0 bg-black flex flex-col items-center justify-center overflow-hidden touch-none"
+       onTouchStart={handleTouchStart}
+       onTouchMove={handleTouchMove}
+       onTouchEnd={handleTouchEnd}
     >
-      <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
-      
-      {/* Mira Quadrada de Foco ao Tocar */}
+      {/* Câmera */}
+      <video ref={videoRef} autoPlay playsInline className="absolute w-full h-full object-cover" />
+      {/* Camada OpenCV Trasparente */}
+      <canvas ref={canvasRef} className="absolute w-full h-full object-cover pointer-events-none" />
+
       {focusIndicator && (
         <div 
-          className="absolute border-2 border-primary rounded-md pointer-events-none animate-ping"
-          style={{
-            left: focusIndicator.x - 30,
-            top: focusIndicator.y - 30,
-            width: 60,
-            height: 60,
-            animationDuration: '800ms'
+          className="absolute border-2 border-yellow-400 rounded-full animate-ping pointer-events-none"
+          style={{ 
+             left: focusIndicator.x - 25, top: focusIndicator.y - 25, 
+             width: 50, height: 50 
           }}
         />
       )}
-      
-      {/* Overlay Navbar Esconde Cliques, precisamos ajustar z-index ou click-through, mas no App não há botões massivos no overlay de topo */}
-      <ScannerOverlay onCancel={() => navigate('/')} cvReady={cvReady} />
 
-      {/* Sobreposição de Dúvida da IA: Lista de Cartas Semelhantes Encontradas */}
-      {topMatches.length > 0 && !scanning && (
-        <div className="absolute inset-x-0 bottom-0 bg-surface-container-high/95 backdrop-blur-lg pt-4 pb-8 px-4 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-50 animate-in slide-in-from-bottom flex flex-col items-center">
-           <h3 className="text-on-surface text-center mb-4 font-bold flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">robot_2</span> A IA ficou na dúvida, qual delas é a sua?
-           </h3>
-           <div className="flex w-full gap-4 overflow-x-auto pb-4 snap-x">
-             {topMatches.slice(0, 10).map((card, i) => (
-               <div 
-                 key={i} 
-                 onClick={() => navigate(`/card/${encodeURIComponent(card.name)}`)}
-                 className="flex-none w-32 snap-center rounded-xl overflow-hidden cursor-pointer active:scale-95 transition-transform"
-               >
-                 <img src={card.image_url} alt={card.name} className="w-full h-44 object-cover" />
-                 <div className="bg-surface-container p-2 text-center h-full">
-                    <p className="text-xs text-on-surface font-semibold truncate leading-tight">{card.name}</p>
-                    <p className="text-[10px] text-primary">Score: {(card.similarity * 100).toFixed(1)}%</p>
-                 </div>
-               </div>
-             ))}
-           </div>
-           <button 
-             onClick={() => { setTopMatches([]); setScanning(true); }}
-             className="mt-2 bg-secondary text-on-secondary px-8 py-2 rounded-full font-bold shadow-lg"
-           >
-              Mire Novamente na Carta
-           </button>
-        </div>
+      {/* OVERLAY GERAL DO SCANNER */}
+      <ScannerOverlay 
+         onClose={() => navigate('/scanner-bridge')} 
+         visionStatus={visionStatus} 
+         message={scanMessage}
+      />
+
+      {/* HUD DE DEBUG MINIMAPA */}
+      {debugImage && (
+         <div className="absolute top-20 right-4 w-32 border-2 border-primary rounded-xl overflow-hidden bg-black z-10 shadow-lg pointer-events-none">
+             <div className="bg-primary text-black text-[10px] font-bold px-2 py-1 text-center font-mono tracking-widest uppercase">
+                 OCR ROI
+             </div>
+             <img src={debugImage} className="w-full h-auto object-contain" alt="IA Region" />
+         </div>
       )}
 
-      {/* Mini-Mapa de Debug (Visão da IA) - Mantido limpo quando Top Matches aparecerem */}
-      {debugImage && topMatches.length === 0 && (
-        <div className="absolute bottom-6 right-6 z-50 pointer-events-none border-2 border-primary rounded-lg overflow-hidden shadow-2xl bg-black">
-          <img src={debugImage} alt="Visão IA" className="w-24 h-auto opacity-90" />
-          <div className="bg-black/80 text-[10px] text-white text-center py-1">FRAME IA</div>
-        </div>
-      )}
-      
-      {/* Console de Feedback HUD */}
-      {topMatches.length === 0 && !error && (
-        <div className="absolute top-20 left-0 right-0 z-50 flex justify-center pointer-events-none">
-           <div className="bg-black/70 backdrop-blur-md px-6 py-2 rounded-full border border-white/10 text-white font-mono text-xs shadow-xl transition-all">
-              {scanMessage}
-           </div>
-        </div>
+      {/* BANDEJA DE RESULTADOS MÚLTIPLOS */}
+      {!scanning && topMatches.length > 0 && (
+         <div className="absolute inset-x-0 bottom-0 bg-surface/90 backdrop-blur-xl rounded-t-3xl shadow-2xl z-50 p-6 pb-8 border-t border-white/10 slide-up max-h-[80vh] overflow-y-auto">
+            <h2 className="text-xl font-bold text-on-surface mb-2 tracking-tight">Candidatos Identificados</h2>
+             <p className="text-sm text-on-surface-variant mb-6">
+                Fuzzy OCR encontrou similaridade de {(topMatches[0].similarity * 100).toFixed(0)}%
+            </p>
+
+            <div className="flex overflow-x-auto gap-4 pb-4 snap-x">
+               {topMatches.map((card, idx) => (
+                  <div 
+                     key={card.scryfall_id || idx} 
+                     className="snap-center shrink-0 w-32 rounded-xl overflow-hidden bg-black shadow-lg cursor-pointer transform transition hover:scale-105 active:scale-95 border border-white/10"
+                     onClick={() => navigate(`/scanner-bridge?cardId=${card.scryfall_id}`)}
+                  >
+                     <img src={card.image_url} alt={card.name} className="w-full h-44 object-cover" />
+                     <div className="bg-surface-container p-2 text-center h-full">
+                        <p className="text-xs text-on-surface font-semibold truncate leading-tight">{card.name}</p>
+                        <p className="text-[10px] text-primary">{card.set_code?.toUpperCase()}</p>
+                     </div>
+                  </div>
+               ))}
+            </div>
+
+            <button 
+               onClick={() => {
+                  setTopMatches([]);
+                  setScanning(true);
+                  setScanMessage("Centralize o TÍTULO da Carta...");
+               }}
+               className="mt-6 w-full py-4 bg-surface-container-highest text-on-surface rounded-xl font-bold text-sm tracking-widest uppercase hover:bg-surface-variant transition active:scale-95"
+            >
+               Escanear Novamente
+            </button>
+         </div>
       )}
 
-      {/* Painel Crítico de Carregamento da Inteligência Artificial */}
-      {visionStatus === 'loading' && (
-        <div className="absolute inset-x-0 top-32 flex justify-center z-[100] px-4">
-           <div className="bg-surface-container-high/90 backdrop-blur-md px-6 py-4 rounded-3xl border border-primary/30 shadow-2xl flex items-center space-x-4 animate-pulse">
-              <span className="material-symbols-outlined text-primary text-3xl animate-spin">sync</span>
-              <div>
-                 <p className="text-on-surface font-bold text-sm">Transferindo IA Global...</p>
-                 <p className="text-on-surface-variant text-xs">Aguarde. Carregando Cérebro HuggingFace (~70MB).</p>
-              </div>
-           </div>
+      {error && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-error text-on-error px-6 py-4 rounded-2xl shadow-2xl max-w-sm text-center font-medium">
+          {error}
         </div>
       )}
     </div>

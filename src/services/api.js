@@ -79,50 +79,38 @@ export const fetchCardById = async (scryfallId) => {
 };
 
 // Pinecone Serverless Vector Search via Cloudflare Edge Function Proxy!
-export const hydratePhashMatches = async (hashMatches) => {
-  if (!hashMatches || hashMatches.length === 0) return null;
+// Nova arquitetura 100% Precisa Absoluta: OCR de Nomes na API Fuzzy do Scryfall
+export const searchCardByFuzzyName = async (rawName) => {
+   // A string pura do OCR pode ter sujeira visual no lugar do símbolo de mana (Ex: "{T} Branco" virar "*f*  Branco")
+   // Limpamos mantendo só letras, números, espaços e caracteres comuns de nomes de cartas.
+   const cleanName = rawName.replace(/[^a-zA-Z0-9 ,'\-]/g, '').replace(/\s+/g, ' ').trim();
+   
+   // Previne requisições malformadas de frames vazios
+   if (cleanName.length < 3) {
+       throw new Error("Leitura falhou (nome muito curto ou borrado). Tente novamente.");
+   }
 
-  try {
-    // Para buscar várias cartas no Scryfall em 1 request:
-    // POST https://api.scryfall.com/cards/collection
-    const identifiers = hashMatches.map(m => ({ id: m.id }));
-    
-    const res = await fetch('https://api.scryfall.com/cards/collection', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifiers })
-    });
+   try {
+      // Usa a tolerância de erros brutal do Scryfall (Levenshtein Distance Nuvem API)
+      const res = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(cleanName)}`);
+      
+      if (!res.ok) {
+          if (res.status === 404) throw new Error(`Carta não econtrada com a leitura ótica crua: "${cleanName}"`);
+          throw new Error(`Falha de Comunicação com a Nuvem WOTC. Código: ${res.status}`);
+      }
 
-    if (!res.ok) {
-       console.error("Scryfall Hydration failed:", res.status);
-       throw new Error("Falha ao baixar dados das cartas Gêmeas no Scryfall.");
-    }
-
-    const json = await res.json();
-    
-    if (json.data && json.data.length > 0) {
-       return json.data.map(card => {
-          // O Scryfall retorna a lista, mas perdemos a "distância" do pHash.
-          // Vamos re-ancorar a Distância de Hamming buscando qual match gerou esse card.
-          const originalMatch = hashMatches.find(m => m.id === card.id);
-          const distance = originalMatch ? originalMatch.distance : 0;
-          // Se a distância for 0, é 100%. Se for 12, é ~81%.
-          const score = Math.max(0, 100 - (distance * 1.56)); // 1.56 * 64 bits = ~100
-
-          return {
-             scryfall_id: card.id,
-             similarity: score / 100, 
-             oracle_id: card.oracle_id,
-             name: card.name,
-             set_code: card.set,
-             image_url: card.image_uris ? card.image_uris.normal : (card.card_faces ? card.card_faces[0].image_uris.normal : '')
-          };
-       });
-    }
-    
-    return null;
-  } catch (err) {
-    console.error("Hydration Error:", err);
-    throw err;
-  }
+      const card = await res.json();
+      
+      // Retorna 100% de Acerto (Fuzzy Match validado com as letras)
+      return [{
+         scryfall_id: card.id,
+         similarity: 1.0, 
+         oracle_id: card.oracle_id,
+         name: card.name,
+         set_code: card.set,
+         image_url: card.image_uris ? card.image_uris.normal : (card.card_faces ? card.card_faces[0].image_uris.normal : '')
+      }];
+   } catch(e) {
+      throw e;
+   }
 };

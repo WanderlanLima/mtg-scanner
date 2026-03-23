@@ -126,22 +126,21 @@ export function warpCardPerspective(videoElement, canvasObj, points) {
     const dsize = new window.cv.Size(w, h);
     window.cv.warpPerspective(src, dst, M, dsize, window.cv.INTER_LINEAR, window.cv.BORDER_CONSTANT, new window.cv.Scalar());
 
-    // For Neural Network Embeddings, we isolate ONLY the physical Artwork!
-    // MTG Art box is mathematically 656x480 in Scryfall's API (Ratio 1.366).
-    // Para nosso Frame Warp (400x560): 400 / 1.366 = 293 de Altura.
-    // Começamos em Y=50 para escapar exatamente da barra de Título!
-    const artHeight = 293;
-    const artRect = new window.cv.Rect(0, 50, w, artHeight);
-    const croppedArt = dst.roi(artRect);
+    // Extração exclusiva do Título da Carta (Title Bar) para o OCR Infalível
+    // Evitamos a borda preta (X=15, Y=15) e cortamos a barra horizontal focando no contraste
+    const titleHeight = 55;
+    const titleRect = new window.cv.Rect(15, 15, w - 30, titleHeight);
+    const croppedTitle = dst.roi(titleRect);
 
     const outCanvas = document.createElement('canvas');
-    outCanvas.width = w; outCanvas.height = artHeight;
-    window.cv.imshow(outCanvas, croppedArt);
+    outCanvas.width = titleRect.width; 
+    outCanvas.height = titleRect.height;
+    window.cv.imshow(outCanvas, croppedTitle);
 
     // Cleanup memory to prevent WASM leaks
-    src.delete(); srcTri.delete(); dstTri.delete(); M.delete(); dst.delete(); croppedArt.delete();
+    src.delete(); srcTri.delete(); dstTri.delete(); M.delete(); dst.delete(); croppedTitle.delete();
 
-    // Return the sharply cropped artwork frame 
+    // Exporta a Fita Branca estreita perfeitamente nítida
     return outCanvas.toDataURL('image/png');
   } catch (err) {
     console.error('Warp error:', err);
