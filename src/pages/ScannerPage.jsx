@@ -179,6 +179,13 @@ export default function ScannerPage() {
          ctx.lineWidth = 3;
          ctx.strokeRect(cx, cy, cw, ch);
          ctx.setLineDash([]);
+         
+         // Dica visual para o usuário usar o override em Monitores
+         ctx.fillStyle = 'rgba(70, 234, 229, 0.8)';
+         ctx.font = 'bold 16px sans-serif';
+         ctx.textAlign = 'center';
+         ctx.fillText('TOQUE NA TELA', cx + cw / 2, cy + ch / 2 - 10);
+         ctx.fillText('PARA FOTOGRAFAR', cx + cw / 2, cy + ch / 2 + 15);
       } else {
         // Checa estabilidade
         const currentCenter = {
