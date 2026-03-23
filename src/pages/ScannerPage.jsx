@@ -35,6 +35,9 @@ export default function ScannerPage() {
       }
     }, 500);
 
+    let stableFramesCount = 0;
+    let lastCenter = { x: 0, y: 0 };
+
     visionWorkerRef.current = new VisionWorker();
     visionWorkerRef.current.onmessage = (e) => {
       const { status, message } = e.data;
@@ -124,7 +127,10 @@ export default function ScannerPage() {
       const ctx = canvasRef.current.getContext('2d');
       ctx.clearRect(0, 0, w, h);
       
+      let isStabilized = false;
+
       if (!points) {
+         stableFramesCount = 0;
          const cw = w * 0.55; 
          const ch = cw * 1.4; 
          const cx = (w - cw) / 2;
@@ -141,6 +147,25 @@ export default function ScannerPage() {
          ctx.strokeRect(cx, cy, cw, ch);
          ctx.setLineDash([]);
       } else {
+        // Checa estabilidade
+        const currentCenter = {
+           x: (points[0].x + points[2].x) / 2,
+           y: (points[0].y + points[2].y) / 2
+        };
+        const dx = Math.abs(currentCenter.x - lastCenter.x);
+        const dy = Math.abs(currentCenter.y - lastCenter.y);
+        
+        if (dx < 35 && dy < 35) {
+           stableFramesCount++;
+        } else {
+           stableFramesCount = 0;
+        }
+        lastCenter = currentCenter;
+        
+        if (stableFramesCount > 10) {
+           isStabilized = true;
+        }
+
         ctx.beginPath();
         ctx.moveTo(points[0].x, points[0].y);
         ctx.lineTo(points[1].x, points[1].y);
@@ -148,12 +173,18 @@ export default function ScannerPage() {
         ctx.lineTo(points[3].x, points[3].y);
         ctx.closePath();
         ctx.lineWidth = 6;
-        ctx.strokeStyle = '#46eae5';
+        ctx.strokeStyle = isStabilized ? '#00ff00' : '#46eae5';
         ctx.stroke();
-        ctx.fillStyle = 'rgba(70, 234, 229, 0.2)';
+        ctx.fillStyle = isStabilized ? 'rgba(0, 255, 0, 0.4)' : 'rgba(70, 234, 229, 0.2)';
         ctx.fill();
       }
 
+      if (!isStabilized) {
+        if (scanning) setTimeout(() => { loopId = requestAnimationFrame(processFrame); }, 50);
+        return;
+      }
+      
+      stableFramesCount = 0;
       const warpedImageSrc = warpCardPerspective(videoRef.current, processCanvasRef.current, points);
       
       if (warpedImageSrc && visionWorkerRef.current) {
