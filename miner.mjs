@@ -65,7 +65,8 @@ async function mineData() {
     console.log(`[${i+1}/${LIMIT}] Desmontando NOVA Carta: ${card.name} (${card.set.toUpperCase()})`);
     
     try {
-      const output = await extractor(card.image_uris.normal);
+      // CIRURGIA: Analisa apenas a "Arte" da carta (ignora os textos e bordas, que confundem a IA)
+      const output = await extractor(card.image_uris.art_crop);
       const embedding = Array.from(output.data);
       
       batch.push({

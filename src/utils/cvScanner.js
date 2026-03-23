@@ -126,15 +126,20 @@ export function warpCardPerspective(videoElement, canvasObj, points) {
     const dsize = new window.cv.Size(w, h);
     window.cv.warpPerspective(src, dst, M, dsize, window.cv.INTER_LINEAR, window.cv.BORDER_CONSTANT, new window.cv.Scalar());
 
-    // For Neural Network Embeddings, we need the FULL colored image (RGB), not grayscale.
+    // For Neural Network Embeddings, we isolate ONLY the physical Artwork!
+    // MTG Art box is roughly from Y=44px to Y=308px on a 400x560 frame.
+    const artHeight = 264;
+    const artRect = new window.cv.Rect(0, 44, w, artHeight);
+    const croppedArt = dst.roi(artRect);
+
     const outCanvas = document.createElement('canvas');
-    outCanvas.width = w; outCanvas.height = h;
-    window.cv.imshow(outCanvas, dst);
+    outCanvas.width = w; outCanvas.height = artHeight;
+    window.cv.imshow(outCanvas, croppedArt);
 
     // Cleanup memory to prevent WASM leaks
-    src.delete(); srcTri.delete(); dstTri.delete(); M.delete(); dst.delete();
+    src.delete(); srcTri.delete(); dstTri.delete(); M.delete(); dst.delete(); croppedArt.delete();
 
-    // Return the full 400x560 flattened card 
+    // Return the sharply cropped artwork frame 
     return outCanvas.toDataURL('image/png');
   } catch (err) {
     console.error('Warp error:', err);
